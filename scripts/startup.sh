@@ -1,6 +1,5 @@
 #!/bin/bash
 set -a
-. /configs/base/config.sh
 
 if [ "$ENABLE_TAILSCALE" != "true" ]; then
   exit
