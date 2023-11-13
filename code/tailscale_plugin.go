@@ -1,4 +1,4 @@
-package tailscale_plugin
+package main
 
 import (
 	"encoding/json"
@@ -169,6 +169,8 @@ func logRequest(handler http.Handler) http.Handler {
 }
 
 func main() {
+	loadConfig()
+
 	if err := validator.SetValidationFunc("ipv4", isValidIPv4); err != nil {
 		return
 	}

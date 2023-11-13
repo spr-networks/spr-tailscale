@@ -1,6 +1,7 @@
-package tailscale_plugin
+package main
 
 import (
+  "bytes"
   "encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,7 @@ var TEST_PREFIX = os.Getenv("TEST_PREFIX")
 var Configmtx sync.RWMutex
 
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
+var ConfigFile = TEST_PREFIX + "/configs/tailscale/config.json"
 
 type DeviceEntry struct {
 	Name       string
@@ -263,4 +265,67 @@ func getSPRRoutes() error {
 
   //return connected_subnets, all_srcips
   return nil
+}
+
+
+func postCustomRoute(SrcIP string, Groups []string) error {
+  custom_interface_rule := CustomInterfaceRule{
+    gSPRTailscaleInterface,
+    SrcIP,
+    Groups,
+    []string{},
+  }
+/*
+Interface string
+SrcIP     string
+Groups    []string
+Tags      []string //unused for now
+*/
+  cli := http.Client{
+		Timeout: time.Second * 2, // Timeout after 2 seconds
+	}
+
+	defer cli.CloseIdleConnections()
+
+  jsonValue, _ := json.Marshal(custom_interface_rule)
+
+	req, err := http.NewRequest(http.MethodPut, "http://localhost:80/firewall/config", bytes.NewBuffer(jsonValue))
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	Configmtx.RLock()
+	token := gConfig.APIToken
+	Configmtx.RUnlock()
+
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	resp, err := cli.Do(req)
+	if err != nil {
+		fmt.Println("request failed", err)
+		return err
+	}
+
+	defer resp.Body.Close()
+
+
+  return nil
+}
+
+
+
+func loadConfig() error {
+	Configmtx.RLock()
+	defer Configmtx.RUnlock()
+	data, err := ioutil.ReadFile(ConfigFile)
+	if err != nil {
+		return err
+	} else {
+		err := json.Unmarshal(data, &gConfig)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
