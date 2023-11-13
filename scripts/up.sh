@@ -1,5 +1,4 @@
 #!/bin/bash
-. /configs/base/config.sh
 
 TAILSCALE_ARGS="--json --timeout ${TAILSCALE_TIMEOUT:-5s}"
 if [ -n "$TAILSCALE_LOGIN_SERVER" ]; then

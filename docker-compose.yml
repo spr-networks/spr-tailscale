@@ -10,7 +10,7 @@ services:
     container_name: tailscale-plugin
     build:
       context: .
-    logging: *default-logging
+    #logging: *default-logging
     cap_add:
       - NET_ADMIN
     sysctls:
@@ -18,6 +18,8 @@ services:
       - net.ipv4.conf.all.route_localnet=1
     networks:
       tailscalenet:
+    ports:
+      - 2345:2345
     volumes:
       - "${SUPERDIR}./state/plugins/tailscale:/state/plugins/tailscale"
       - "${SUPERDIR}./state/public/:/state/public/:ro"

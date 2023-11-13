@@ -1,4 +1,4 @@
-package tailscale_plugin
+package main
 
 import (
 	"encoding/json"
