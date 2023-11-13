@@ -20,6 +20,10 @@ var UNIX_PLUGIN_LISTENER = "/state/plugins/tailscale/tailscale_plugin"
 var UNIX_TAILSCALE_SOCK = "/state/plugins/tailscale/tailscaled/tailscaled.sock"
 var TailscaleInterface = "tailscale0"
 
+// the name of the interface from the docker network (see docker-compose.yml)
+// which is visible outside of the contianer.
+var gSPRTailscaleInterface = "tailscale"
+
 type tailscalePlugin struct {
 	clientMtx sync.Mutex
 	tsdClient tailscale.LocalClient
