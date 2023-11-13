@@ -1,5 +1,15 @@
 # plugin-wireguard
 
+### Setup
+
+Generate an API token in the SPR API (under Auth)
+
+And in `super/configs/plugins/tailscale/config.json` write
+```json
+{"APIToken": "yourToken"}
+```
+
+
 ### Note:
 If using custom wireguard configurations with SPR groups, be sure to use "wg" as the prefix to the interface name,
 so that the API does not flush the devices from the groups.
@@ -32,4 +42,3 @@ curl -s --unix-socket $SOCK http://localhost/peer -X PUT --data "{\"PublicKey\":
 ```
 
 use the ui for .conf and qrcode
-
