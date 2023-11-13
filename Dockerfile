@@ -10,7 +10,7 @@ RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.19.linux-${TARGETARCH}.ta
 ENV PATH="/usr/local/go/bin:$PATH"
 COPY code/ /code/
 
-RUN --mount=type=tmpfs,target=/root/go/ (go build -ldflags "-s -w" -o /tailscale_plugin /code/tailscale_plugin.go)
+RUN --mount=type=tmpfs,target=/root/go/ (go build -ldflags "-s -w" -o /tailscale_plugin /code/)
 
 FROM ghcr.io/spr-networks/container_template:latest
 ENV DEBIAN_FRONTEND=noninteractive
