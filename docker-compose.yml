@@ -1,0 +1,27 @@
+version: '3.4'
+
+x-logging:
+  &default-logging
+  driver: journald
+
+
+services:
+  tailscale-plugin:
+    container_name: tailscale-plugin
+    build:
+      context: .
+    logging: *default-logging
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.route_localnet=1
+    networks:
+      tailscalenet:
+    volumes:
+      - "${SUPERDIR}./state/plugins/tailsccale:/state/plugins/tailscale"
+
+networks:
+  tailscalenet:
+    driver_opts:
+      com.docker.network.bridge.name: tailscale
