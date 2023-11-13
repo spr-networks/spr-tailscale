@@ -19,7 +19,9 @@ services:
     networks:
       tailscalenet:
     volumes:
-      - "${SUPERDIR}./state/plugins/tailsccale:/state/plugins/tailscale"
+      - "${SUPERDIR}./state/plugins/tailscale:/state/plugins/tailscale"
+      - "${SUPERDIR}./state/public/:/state/public/:ro"
+      - "${SUPERDIR}./configs/plugins/tailscale:/configs/tailscale"
 
 networks:
   tailscalenet:
