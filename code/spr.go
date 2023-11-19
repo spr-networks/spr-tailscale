@@ -177,13 +177,19 @@ var gConfig = Config{}
 func getSPRFirewallConfig() (FirewallConfig, error) {
 	firewallConfig := FirewallConfig{}
 
+	gw, err := getGateway()
+	if err != nil {
+		fmt.Println("[-] Could not retrieve API from gateway address")
+		return firewallConfig, err
+	}
+
 	cli := http.Client{
 		Timeout: time.Second * 2, // Timeout after 2 seconds
 	}
 
 	defer cli.CloseIdleConnections()
 
-	req, err := http.NewRequest(http.MethodGet, "http://localhost:80/firewall/config", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://"+gw+":80/firewall/config", nil)
 	if err != nil {
 		fmt.Println(err)
 		return firewallConfig, err
@@ -297,7 +303,14 @@ func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDs
 	if doDelete {
 		meth = http.MethodDelete
 	}
-	req, err := http.NewRequest(meth, "http://localhost:80/firewall/custom_interface", bytes.NewBuffer(jsonValue))
+
+	gw, err := getGateway()
+	if err != nil {
+		fmt.Println("[-] Could not retrieve API from gateway address")
+		return err
+	}
+
+	req, err := http.NewRequest(meth, "http://"+gw+":80/firewall/custom_interface", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		fmt.Println(err)
 		return err
