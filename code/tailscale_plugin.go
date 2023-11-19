@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -171,25 +173,27 @@ func logRequest(handler http.Handler) http.Handler {
 }
 
 func getGateway() (string, error) {
-
-	routeFilter := &netlink.Route{
-		Protocol: netlink.FAMILY_V4,
-	}
-
-	routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, routeFilter, netlink.RT_FILTER_PROTOCOL)
+	cmd := exec.Command("ip", "route")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
 	if err != nil {
+		fmt.Println("Error executing command:", err)
 		return "", err
 	}
 
-	for _, route := range routes {
-		// The default gateway is the one where the Src and Dst fields are nil
-		if route.Dst == nil && route.Src == nil {
-			fmt.Println("Default Gateway:", route.Gw)
-			return route.Gw.String(), nil
+	// Process the output
+	for _, line := range strings.Split(out.String(), "\n") {
+		if strings.Contains(line, "default") {
+			fields := strings.Fields(line)
+			if len(fields) > 2 {
+				return fields[2], nil
+				break
+			}
 		}
 	}
 
-	return "", fmt.Errorf("no gateway")
+	return "", fmt.Errorf("gateway not found")
 }
 
 func routeTracker() {
