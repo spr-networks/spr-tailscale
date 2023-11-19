@@ -447,7 +447,16 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
 	}
 }
 
+func rebuildPostrouting() {
+	//TbD
+	//  nft add chain ip filter POSTROUTING { type nat hook postrouting priority 100 \; }
+	//  nft add rule ip filter POSTROUTING oif "tailscale0" masquerade
+
+}
+
 func rebuildState() {
+
+	rebuildPostrouting()
 
 	fw, err := getSPRFirewallConfig()
 	if err != nil {

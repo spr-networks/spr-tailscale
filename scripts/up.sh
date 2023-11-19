@@ -12,6 +12,9 @@ fi
 # The user may still need to login and/or authorize via the web UI to finish connecting.
 tailscale up $TAILSCALE_ARGS "$@"
 
+###TBD fix this race, see rebuildPostrouting
+sleep 3
+
 # forward from SPR into the tailscale network
 nft add chain ip filter POSTROUTING { type nat hook postrouting priority 100 \; }
 nft add rule ip filter POSTROUTING oif "tailscale0" masquerade
