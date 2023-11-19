@@ -75,8 +75,8 @@ type ForwardingBlockRule struct {
 type CustomInterfaceRule struct {
 	BaseRule
 	Interface string
-	DstRoute  string
 	SrcIP     string
+	DstRoute  string
 	Groups    []string
 	Tags      []string //unused for now
 }
@@ -227,7 +227,7 @@ func TinyIpDelta(IP string, delta int) string {
 }
 
 func toSubnet(IP string) string {
-	return TinyIpDelta(IP, -1) + "/30"
+	return TinyIpDelta(IP, -2) + "/30"
 }
 
 func getSPRRoutes() ([]string, error) {
