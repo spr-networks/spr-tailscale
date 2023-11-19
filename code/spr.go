@@ -1,19 +1,21 @@
 package main
 
 import (
-  "bytes"
-  "encoding/binary"
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-  "net"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"reflect"
-  "slices"
+	"slices"
 	"sort"
+	"strings"
 	"sync"
-  "time"
+	"time"
 )
 
 var TEST_PREFIX = os.Getenv("TEST_PREFIX")
@@ -21,6 +23,7 @@ var Configmtx sync.RWMutex
 
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
 var ConfigFile = TEST_PREFIX + "/configs/tailscale/config.json"
+var gDefaultGroups = []string{"tailnet"}
 
 type DeviceEntry struct {
 	Name       string
@@ -43,6 +46,7 @@ type BaseRule struct {
 	Disabled bool
 }
 
+/*
 type ForwardingRule struct {
 	BaseRule
 	Protocol string
@@ -66,9 +70,12 @@ type ForwardingBlockRule struct {
 	DstPort  string
 	SrcIP    string
 }
+*/
 
 type CustomInterfaceRule struct {
+	BaseRule
 	Interface string
+	DstRoute  string
 	SrcIP     string
 	Groups    []string
 	Tags      []string //unused for now
@@ -103,6 +110,7 @@ func (c *CustomInterfaceRule) Equals(other *CustomInterfaceRule) bool {
 	return reflect.DeepEqual(cCopy, otherCopy)
 }
 
+/*
 type ServicePort struct {
 	Protocol        string
 	Port            string
@@ -128,17 +136,18 @@ type MulticastPort struct {
 	Port     string //udp port number to listen on
 	Upstream bool   // if enabled will advertose both on uplink and lan interfaces
 }
-
+*/
+//TBD see if we can remove everything but CustomInterfaceRules
 type FirewallConfig struct {
-	ForwardingRules      []ForwardingRule
-	BlockRules           []BlockRule
-	ForwardingBlockRules []ForwardingBlockRule
+	//	ForwardingRules      []ForwardingRule
+	//	BlockRules           []BlockRule
+	//	ForwardingBlockRules []ForwardingBlockRule
 	CustomInterfaceRules []CustomInterfaceRule
-	ServicePorts         []ServicePort
-	Endpoints            []Endpoint
-	MulticastPorts       []MulticastPort
-	PingLan              bool
-	PingWan              bool
+	// ServicePorts         []ServicePort
+	// Endpoints            []Endpoint
+	// MulticastPorts       []MulticastPort
+	// PingLan              bool
+	// PingWan              bool
 }
 
 func APIDevices() (map[string]DeviceEntry, error) {
@@ -160,13 +169,13 @@ func APIDevices() (map[string]DeviceEntry, error) {
 }
 
 type Config struct {
-	APIToken        string
+	APIToken string
 }
 
 var gConfig = Config{}
 
 func getSPRFirewallConfig() (FirewallConfig, error) {
-  firewallConfig := FirewallConfig{}
+	firewallConfig := FirewallConfig{}
 
 	cli := http.Client{
 		Timeout: time.Second * 2, // Timeout after 2 seconds
@@ -194,12 +203,12 @@ func getSPRFirewallConfig() (FirewallConfig, error) {
 
 	defer resp.Body.Close()
 
-  err = json.NewDecoder(resp.Body).Decode(&firewallConfig)
+	err = json.NewDecoder(resp.Body).Decode(&firewallConfig)
 	if err != nil {
 		return firewallConfig, err
 	}
 
-  return firewallConfig, nil
+	return firewallConfig, nil
 }
 
 func TwiddleTinyIP(net_ip net.IP, delta int) net.IP {
@@ -211,85 +220,84 @@ func TinyIpDelta(IP string, delta int) string {
 	return TwiddleTinyIP(net.ParseIP(IP), delta).String()
 }
 
-
 func toSubnet(IP string) string {
-  return TinyIpDelta(IP, -1) + "/30"
+	return TinyIpDelta(IP, -1) + "/30"
 }
 
-func getSPRRoutes() error {
+func getSPRRoutes() ([]string, error) {
+	connected_subnets := []string{}
 
-  //grab devices
-  devices, err := APIDevices()
-  if err != nil {
-    return err
-  }
+	//grab devices
+	devices, err := APIDevices()
+	if err != nil {
+		return connected_subnets, err
+	}
 
-  //get all routes
-  config, err := getSPRFirewallConfig()
-  if err != nil  {
-    return err
-  }
+	//get all routes
+	config, err := getSPRFirewallConfig()
+	if err != nil {
+		return connected_subnets, err
+	}
 
-  all_groups := []string{}
-  all_srcips := []string{}
-  custom_interfaces := config.CustomInterfaceRules
-  // gather all groups for "tailscale"
-  for _, custom := range custom_interfaces {
-    if custom.Interface == gSPRTailscaleInterface {
-      for _, group := range custom.Groups {
-        if !slices.Contains(all_groups, group) {
-          all_groups = append(all_groups, group)
-        }
-      }
+	all_groups := []string{}
+	all_srcips := []string{}
+	custom_interfaces := config.CustomInterfaceRules
+	// gather all groups for "tailscale"
+	for _, custom := range custom_interfaces {
+		if custom.Interface == gSPRTailscaleInterface {
+			for _, group := range custom.Groups {
+				if !slices.Contains(all_groups, group) {
+					all_groups = append(all_groups, group)
+				}
+			}
 
-      if !slices.Contains(all_srcips, custom.SrcIP) {
-        all_srcips = append(all_srcips, custom.SrcIP)
-      }
-    }
-  }
+			if !slices.Contains(all_srcips, custom.SrcIP) {
+				all_srcips = append(all_srcips, custom.SrcIP)
+			}
+		}
+	}
 
-  connected_subnets := []string{}
-  //now iterate groups in devices to get each /30
-  for _, device := range devices {
-    if device.RecentIP != "" {
+	//now iterate groups in devices to get each /30
+	for _, device := range devices {
+		if device.RecentIP != "" {
 
-      inGroup := slices.ContainsFunc(device.Groups, func(group string) bool {
-    		return slices.Contains(all_groups, group)
-    	})
+			inGroup := slices.ContainsFunc(device.Groups, func(group string) bool {
+				return slices.Contains(all_groups, group)
+			})
 
-      if inGroup {
-        connected_subnets = append(connected_subnets, toSubnet(device.RecentIP))
-      }
-    }
-  }
+			if inGroup {
+				connected_subnets = append(connected_subnets, toSubnet(device.RecentIP))
+			}
+		}
+	}
 
-  //return connected_subnets, all_srcips
-  return nil
+	return connected_subnets, nil
 }
 
+func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDst string) error {
+	custom_interface_rule := CustomInterfaceRule{
+    BaseRule{"GeneratedTailscale-" + SrcIP,
+    false},
+		gSPRTailscaleInterface,
+		SrcIP,
+		RouteDst,
+		Groups,
+		[]string{},
+	}
 
-func postCustomRoute(SrcIP string, Groups []string) error {
-  custom_interface_rule := CustomInterfaceRule{
-    gSPRTailscaleInterface,
-    SrcIP,
-    Groups,
-    []string{},
-  }
-/*
-Interface string
-SrcIP     string
-Groups    []string
-Tags      []string //unused for now
-*/
-  cli := http.Client{
+	cli := http.Client{
 		Timeout: time.Second * 2, // Timeout after 2 seconds
 	}
 
 	defer cli.CloseIdleConnections()
 
-  jsonValue, _ := json.Marshal(custom_interface_rule)
+	jsonValue, _ := json.Marshal(custom_interface_rule)
 
-	req, err := http.NewRequest(http.MethodPut, "http://localhost:80/firewall/config", bytes.NewBuffer(jsonValue))
+	meth := http.MethodPut
+	if doDelete {
+		meth = http.MethodDelete
+	}
+	req, err := http.NewRequest(meth, "http://localhost:80/firewall/custom_interface", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -309,11 +317,8 @@ Tags      []string //unused for now
 
 	defer resp.Body.Close()
 
-
-  return nil
+	return nil
 }
-
-
 
 func loadConfig() error {
 	Configmtx.RLock()
@@ -328,4 +333,111 @@ func loadConfig() error {
 		}
 	}
 	return nil
+}
+
+func advertiseRoutes(routes []string) error {
+	return exec.Command("tailscale", "up", "--advertise-routes="+strings.Join(routes, ",")).Run()
+}
+
+func collectPeerIPs() []string {
+	cmd := exec.Command("tailscale", "status")
+	stdout, err := cmd.Output()
+	if err != nil {
+		fmt.Println("[-] Failed to get status")
+		return []string{}
+	}
+
+	lines := strings.Split(string(stdout), "\n")
+
+	var entries []string
+	for _, line := range lines {
+		parts := strings.Fields(line)
+		if len(parts) > 0 {
+			entries = append(entries, parts[0])
+		}
+	}
+
+	if len(entries) > 1 {
+		return entries[1:]
+	}
+
+	return []string{}
+}
+
+func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string) {
+
+}
+
+func getContainerIP() string {
+  iface, err := net.InterfaceByName("eth0")
+  if err != nil {
+      fmt.Println("Error:", err)
+      return ""
+  }
+
+  // Get the list of unicast interface addresses for the specified interface
+  addrs, err := iface.Addrs()
+  if err != nil {
+      fmt.Println("Error:", err)
+      return ""
+  }
+
+  if len(addrs) > 0 {
+    return addrs[0].String()
+  }
+  return ""
+}
+
+func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
+  containerIP := getContainerIP()
+
+	for _, ip := range tailscaleIPs {
+		found_peer := false
+		for _, crule := range fw.CustomInterfaceRules {
+			if crule.SrcIP == ip {
+				found_peer = true
+				break
+			}
+		}
+
+		if !found_peer {
+			//install this peer
+			err := updateCustomInterface(false, ip, gDefaultGroups, containerIP)
+			if err != nil {
+				fmt.Println("[-] Failed to install peer "+ip, err)
+			}
+		}
+	}
+}
+
+func rebuildState() {
+
+	fw, err := getSPRFirewallConfig()
+	if err != nil {
+		fmt.Println("[-] Failed to load fw config")
+		return
+	}
+
+	//first half, get known tailscale peers, and advertise them to SPR
+	tailscaleIPs := collectPeerIPs()
+	//func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDst string) error {
+
+	//first remove any peers that dont belong
+	cleanOldPeers(fw, tailscaleIPs)
+
+	installNewPeers(fw, tailscaleIPs)
+
+	//second half, get routes for tailscale and advertise them.
+	routes, err := getSPRRoutes()
+	if err != nil {
+		fmt.Println("[-] Failed to get SPR routes to advertise to tailscale")
+		return
+	}
+
+	err = advertiseRoutes(routes)
+	if err != nil {
+		fmt.Println("[-] Failed to advertise routes to tailscale")
+		return
+	}
+
 }

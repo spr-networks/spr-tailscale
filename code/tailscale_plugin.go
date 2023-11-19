@@ -3,15 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"sync"
-)
 
-import (
 	"github.com/gorilla/mux"
+	"github.com/vishvananda/netlink"
 	"gopkg.in/validator.v2"
 	"tailscale.com/client/tailscale"
 )
@@ -21,8 +21,10 @@ var UNIX_TAILSCALE_SOCK = "/state/plugins/tailscale/tailscaled/tailscaled.sock"
 var TailscaleInterface = "tailscale0"
 
 // the name of the interface from the docker network (see docker-compose.yml)
-// which is visible outside of the contianer.
+// which is visible outside of the container.
 var gSPRTailscaleInterface = "tailscale"
+
+//https://pkg.go.dev/tailscale.com/client/tailscale
 
 type tailscalePlugin struct {
 	clientMtx sync.Mutex
@@ -168,6 +170,25 @@ func logRequest(handler http.Handler) http.Handler {
 	})
 }
 
+func routeTracker() {
+
+	updates := make(chan netlink.RouteUpdate)
+	if err := netlink.RouteSubscribe(updates, nil); err != nil {
+		log.Fatalf("Failed to subscribe to route updates: %v", err)
+	}
+
+	// Listen for updates
+	for update := range updates {
+		if update.Type == netlink.RTM_NEWROUTE {
+			//Src, Dst/ Iifname, Oifname
+			rebuildState()
+		} else if update.Type == netlink.RTM_DELROUTE {
+			rebuildState()
+		}
+	}
+
+}
+
 func main() {
 	loadConfig()
 
@@ -184,6 +205,8 @@ func main() {
 			UseSocketOnly: true,
 		},
 	}
+
+	rebuildState()
 
 	unix_plugin_router := mux.NewRouter().StrictSlash(true)
 

@@ -6,6 +6,7 @@ toolchain go1.21.4
 
 require (
 	github.com/gorilla/mux v1.8.0
+	github.com/vishvananda/netlink v1.2.1-beta.2
 	gopkg.in/validator.v2 v2.0.1
 	tailscale.com v1.52.1
 )
@@ -24,6 +25,7 @@ require (
 	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/tailscale/go-winio v0.0.0-20231025203758-c4f33415bf55 // indirect
+	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go4.org/mem v0.0.0-20220726221520-4f986261bf13 // indirect
 	go4.org/netipx v0.0.0-20230824141953-6213f710f925 // indirect
