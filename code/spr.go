@@ -276,8 +276,8 @@ func getSPRRoutes() ([]string, error) {
 
 func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDst string) error {
 	custom_interface_rule := CustomInterfaceRule{
-    BaseRule{"GeneratedTailscale-" + SrcIP,
-    false},
+		BaseRule{"GeneratedTailscale-" + SrcIP,
+			false},
 		gSPRTailscaleInterface,
 		SrcIP,
 		RouteDst,
@@ -365,36 +365,60 @@ func collectPeerIPs() []string {
 }
 
 func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string) {
+	containerIP := getContainerIP()
 
+	for _, entry := range fw.CustomInterfaceRules {
+		if entry.Interface == gSPRTailscaleInterface {
+			found_peer := false
+			//skip non cg nat addrs. we're looking for peers
+			if entry.SrcIP[:4] != "100." {
+				continue
+			}
+			for _, ip := range tailscaleIPs {
+				if ip == entry.SrcIP {
+					found_peer = true
+				}
+			}
+
+			if !found_peer {
+				//scanned tailscale ips, IP is not known, remove it
+				err := updateCustomInterface(true, entry.SrcIP, gDefaultGroups, containerIP)
+				if err != nil {
+					fmt.Println("[-] Failed to delete peer "+entry.SrcIP, err)
+				}
+
+			}
+		}
+	}
 }
 
 func getContainerIP() string {
-  iface, err := net.InterfaceByName("eth0")
-  if err != nil {
-      fmt.Println("Error:", err)
-      return ""
-  }
+	iface, err := net.InterfaceByName("eth0")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return ""
+	}
 
-  // Get the list of unicast interface addresses for the specified interface
-  addrs, err := iface.Addrs()
-  if err != nil {
-      fmt.Println("Error:", err)
-      return ""
-  }
+	// Get the list of unicast interface addresses for the specified interface
+	addrs, err := iface.Addrs()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return ""
+	}
 
-  if len(addrs) > 0 {
-    return addrs[0].String()
-  }
-  return ""
+	if len(addrs) > 0 {
+		return addrs[0].String()
+	}
+	return ""
 }
 
 func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
-  containerIP := getContainerIP()
+	containerIP := getContainerIP()
 
 	for _, ip := range tailscaleIPs {
 		found_peer := false
 		for _, crule := range fw.CustomInterfaceRules {
-			if crule.SrcIP == ip {
+			if crule.Interface == gSPRTailscaleInterface && crule.SrcIP == ip {
 				found_peer = true
 				break
 			}

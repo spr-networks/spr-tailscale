@@ -178,13 +178,9 @@ func routeTracker() {
 	}
 
 	// Listen for updates
-	for update := range updates {
-		if update.Type == netlink.RTM_NEWROUTE {
-			//Src, Dst/ Iifname, Oifname
-			rebuildState()
-		} else if update.Type == netlink.RTM_DELROUTE {
-			rebuildState()
-		}
+	for _ = range updates {
+		//Src, Dst/ Iifname, Oifname
+		rebuildState()
 	}
 
 }
