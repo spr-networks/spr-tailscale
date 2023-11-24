@@ -1,4 +1,4 @@
-# plugin-wireguard
+# spr-tailscale
 
 ### Setup
 
