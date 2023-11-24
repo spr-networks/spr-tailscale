@@ -11,6 +11,8 @@ services:
     build:
       context: .
     logging: *default-logging
+    environment:
+      TS_STATE_DIR=/var/lib/tailscale
     cap_add:
       - NET_ADMIN
       - NET_RAW
