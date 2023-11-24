@@ -1,10 +1,6 @@
 #!/bin/bash
 set -a
 
-if [ "$ENABLE_TAILSCALE" != "true" ]; then
-  exit
-fi
-
 TAILSCALE_STATE_DIR=/state/tailscale/tailscaled
 
 tailscaled & >$TAILSCALE_STATE_DIR/stdout.log 2>$TAILSCALE_STATE_DIR/stderr.log
