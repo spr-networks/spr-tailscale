@@ -1,8 +1,8 @@
 version: '3.4'
 
-#x-logging:
-#  &default-logging
-#  driver: journald
+x-logging:
+  &default-logging
+  driver: journald
 
 
 services:
@@ -10,7 +10,7 @@ services:
     container_name: tailscale-plugin
     build:
       context: .
-#    logging: *default-logging
+    logging: *default-logging
     cap_add:
       - NET_ADMIN
       - NET_RAW
