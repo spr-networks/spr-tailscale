@@ -12,7 +12,7 @@ services:
       context: .
     logging: *default-logging
     environment:
-      TS_STATE_DIR=/var/lib/tailscale
+      - TS_STATE_DIR=/var/lib/tailscale
     cap_add:
       - NET_ADMIN
       - NET_RAW
