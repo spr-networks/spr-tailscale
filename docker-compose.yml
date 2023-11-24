@@ -22,6 +22,7 @@ services:
     volumes:
       - "${SUPERDIR}./state/plugins/tailscale:/state/plugins/tailscale"
       - "${SUPERDIR}./state/public/:/state/public/:ro"
+      - "${SUPERDIR}./state/api/:/state/api/:ro"
       - "${SUPERDIR}./configs/plugins/tailscale:/configs/tailscale"
       - "${SUPERDIR}./state/plugins/tailscale/varlib:/var/lib"
       - /dev/net/tun:/dev/net/tun
