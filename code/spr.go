@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +17,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+)
+
+import (
+	"github.com/spr-networks/sprbus"
 )
 
 var TEST_PREFIX = os.Getenv("TEST_PREFIX")
@@ -45,32 +50,6 @@ type BaseRule struct {
 	RuleName string
 	Disabled bool
 }
-
-/*
-type ForwardingRule struct {
-	BaseRule
-	Protocol string
-	DstIP    string
-	DstPort  string
-	SrcIP    string
-	SrcPort  string
-}
-
-type BlockRule struct {
-	BaseRule
-	Protocol string
-	DstIP    string
-	SrcIP    string
-}
-
-type ForwardingBlockRule struct {
-	BaseRule
-	Protocol string
-	DstIP    string
-	DstPort  string
-	SrcIP    string
-}
-*/
 
 type CustomInterfaceRule struct {
 	BaseRule
@@ -110,44 +89,9 @@ func (c *CustomInterfaceRule) Equals(other *CustomInterfaceRule) bool {
 	return reflect.DeepEqual(cCopy, otherCopy)
 }
 
-/*
-type ServicePort struct {
-	Protocol        string
-	Port            string
-	UpstreamEnabled bool
-}
-
-// an endpoint describes an arbitrary service. It serves
-// as a helper for creating other firewall rules,
-// as well as one-way connectivity from devices to the endpoint
-// when they share a tag.
-type Endpoint struct {
-	BaseRule
-	Protocol string
-	IP       string
-	Domain   string
-	Port     string
-	Tags     []string
-}
-
-// NOTE , we do not need an address to filter with as well,
-// the multicast proxy will take care of that.
-type MulticastPort struct {
-	Port     string //udp port number to listen on
-	Upstream bool   // if enabled will advertose both on uplink and lan interfaces
-}
-*/
-//TBD see if we can remove everything but CustomInterfaceRules
 type FirewallConfig struct {
-	//	ForwardingRules      []ForwardingRule
-	//	BlockRules           []BlockRule
-	//	ForwardingBlockRules []ForwardingBlockRule
+	//we only care about tehse.
 	CustomInterfaceRules []CustomInterfaceRule
-	// ServicePorts         []ServicePort
-	// Endpoints            []Endpoint
-	// MulticastPorts       []MulticastPort
-	// PingLan              bool
-	// PingWan              bool
 }
 
 func APIDevices() (map[string]DeviceEntry, error) {
@@ -486,4 +430,22 @@ func rebuildState() {
 		return
 	}
 
+}
+
+func handleDeviceEvent(topic string, value string) {
+	//if there was a device update, do rebuild the state.
+	rebuildState()
+}
+
+func busListener() {
+	go func() {
+		for i := 30; i > 0; i-- {
+			err := sprbus.HandleEvent("device:", handleDeviceEvent)
+			if err != nil {
+				log.Println(err)
+			}
+			time.Sleep(3 * time.Second)
+		}
+		log.Fatal("failed to establish connection to sprbus")
+	}()
 }

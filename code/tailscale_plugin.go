@@ -246,6 +246,8 @@ func main() {
 		panic(err)
 	}
 
+	busListener()
+
 	pluginServer := http.Server{Handler: logRequest(unix_plugin_router)}
 
 	pluginServer.Serve(unixPluginListener)
