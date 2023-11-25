@@ -223,15 +223,7 @@ func getSPRRoutes() ([]string, error) {
 
 	return connected_subnets, nil
 }
-func installTailscaleAccess() {
-	/*
-	  curl 'http://192.168.2.218/firewall/custom_interface' \
-	  -X 'PUT' \
-	  --data-raw '{"SrcIP":"172.18.0.2","SetRoute":true,"Interface":"tailscale","Groups":["wan","dns","tailscale"]}' \
-	  --compressed \
-	  --insecure*/
 
-}
 func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDst string) error {
 	custom_interface_rule := CustomInterfaceRule{
 		BaseRule{"GeneratedTailscale-" + SrcIP,
@@ -281,6 +273,10 @@ func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDs
 	}
 
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("resp failure " + resp.Status)
+	}
 
 	return nil
 }
@@ -373,7 +369,11 @@ func getContainerIP() string {
 	}
 
 	if len(addrs) > 0 {
-		return addrs[0].String()
+		ip := addrs[0].String()
+		if strings.Contains(ip, "/") {
+			ip = strings.Split(ip, "/")[0]
+		}
+		return ip
 	}
 	return ""
 }

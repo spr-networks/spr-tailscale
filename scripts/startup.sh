@@ -1,5 +1,6 @@
 #!/bin/bash
 set -a
+. /configs/tailscale/config.sh
 
 TAILSCALE_STATE_DIR=/state/tailscale/tailscaled
 
