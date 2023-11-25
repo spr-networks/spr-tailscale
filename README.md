@@ -19,7 +19,7 @@ cd spr-tailscale
 
 ### Usage
 
-To share tailscale access with SPR devices, add the SPR devices to the 'tailnet' group.
+To share all tailscale access with SPR devices, add the SPR devices to the 'tailnet' group.
 
 ### TBD
 
