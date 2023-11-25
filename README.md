@@ -19,4 +19,9 @@ cd spr-tailscale
 
 ### Usage
 
-To share tailscale access with SPR devices, add them to the 'tailnet' group.
+To share tailscale access with SPR devices, add the SPR devices to the 'tailnet' group.
+
+### TBD
+
+Simplify adding specific tailscale peers to custom groups. To do this currently,
+visit the `Custom Interface Access` page and update the peer IP with groups that should have access.
