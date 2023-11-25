@@ -55,7 +55,7 @@ type CustomInterfaceRule struct {
 	BaseRule
 	Interface string
 	SrcIP     string
-	DstRoute  string
+	RouteDst  string
 	Groups    []string
 	Tags      []string //unused for now
 }
@@ -223,7 +223,15 @@ func getSPRRoutes() ([]string, error) {
 
 	return connected_subnets, nil
 }
+func installTailscaleAccess() {
+	/*
+	  curl 'http://192.168.2.218/firewall/custom_interface' \
+	  -X 'PUT' \
+	  --data-raw '{"SrcIP":"172.18.0.2","SetRoute":true,"Interface":"tailscale","Groups":["wan","dns","tailscale"]}' \
+	  --compressed \
+	  --insecure*/
 
+}
 func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDst string) error {
 	custom_interface_rule := CustomInterfaceRule{
 		BaseRule{"GeneratedTailscale-" + SrcIP,
@@ -293,7 +301,8 @@ func loadConfig() error {
 }
 
 func advertiseRoutes(routes []string) error {
-	return exec.Command("tailscale", "up", "--advertise-routes="+strings.Join(routes, ",")).Run()
+	//this script inherits auth key parameters and so on
+	return exec.Command("/scripts/up.sh", "--advertise-routes="+strings.Join(routes, ",")).Run()
 }
 
 func collectPeerIPs() []string {
@@ -410,7 +419,6 @@ func rebuildState() {
 
 	//first half, get known tailscale peers, and advertise them to SPR
 	tailscaleIPs := collectPeerIPs()
-	//func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDst string) error {
 
 	//first remove any peers that dont belong
 	cleanOldPeers(fw, tailscaleIPs)
@@ -430,6 +438,8 @@ func rebuildState() {
 		return
 	}
 
+	//publish peers on bus
+	sprbus.Publish("tailscale:peers", tailscaleIPs)
 }
 
 func handleDeviceEvent(topic string, value string) {
