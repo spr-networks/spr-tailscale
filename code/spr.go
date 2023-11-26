@@ -26,6 +26,19 @@ import (
 var TEST_PREFIX = os.Getenv("TEST_PREFIX")
 var Configmtx sync.RWMutex
 
+type TailscalePeer struct {
+	IP     string
+	Groups []string
+	Tags   []string //unused for now
+}
+
+type Config struct {
+	APIToken string
+	Peers    []TailscalePeer
+}
+
+var gConfig = Config{}
+
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
 var ConfigFile = TEST_PREFIX + "/configs/tailscale/config.json"
 var gDefaultGroups = []string{"tailnet"}
@@ -111,12 +124,6 @@ func APIDevices() (map[string]DeviceEntry, error) {
 
 	return devs, nil
 }
-
-type Config struct {
-	APIToken string
-}
-
-var gConfig = Config{}
 
 func getSPRFirewallConfig() (FirewallConfig, error) {
 	firewallConfig := FirewallConfig{}
@@ -344,7 +351,7 @@ func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string) {
 
 			if !found_peer {
 				//scanned tailscale ips, IP is not known, remove it
-				err := updateCustomInterface(true, entry.SrcIP, gDefaultGroups, containerIP)
+				err := updateCustomInterface(true, entry.SrcIP, entry.Groups, containerIP)
 				if err != nil {
 					fmt.Println("[-] Failed to delete peer "+entry.SrcIP, err)
 				}
@@ -378,21 +385,56 @@ func getContainerIP() string {
 	return ""
 }
 
+func matchPeerConfig(crule CustomInterfaceRule, ip string) (bool, []string, []string) {
+	//this routine returns false if peer is configured and different than the interface rule
+	Configmtx.RLock()
+	defer Configmtx.RUnlock()
+
+	for _, peer := range gConfig.Peers {
+		if peer.IP == ip {
+			ret := slices.Compare(peer.Groups, crule.Groups)
+			if ret == 0 {
+				ret = slices.Compare(peer.Tags, crule.Tags)
+				return ret == 0, peer.Groups, peer.Tags
+			}
+			return ret == 0, peer.Groups, peer.Tags
+		}
+	}
+
+	//we return true if not in peers
+	return true, []string{}, []string{}
+}
+
 func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
 	containerIP := getContainerIP()
 
+	groups := gDefaultGroups
 	for _, ip := range tailscaleIPs {
 		found_peer := false
 		for _, crule := range fw.CustomInterfaceRules {
 			if crule.Interface == gSPRTailscaleInterface && crule.SrcIP == ip {
-				found_peer = true
-				break
+
+				ok, new_groups, _ := matchPeerConfig(crule, ip)
+				if !ok {
+					//delete peer and reinstall
+					groups = new_groups
+					err := updateCustomInterface(true, crule.SrcIP, crule.Groups, containerIP)
+					if err != nil {
+						fmt.Println("[-] Failed to delete peer "+crule.SrcIP, err)
+					}
+					break
+				} else {
+					//peer already established with correct groups
+					found_peer = true
+					break
+				}
+
 			}
 		}
 
 		if !found_peer {
 			//install this peer
-			err := updateCustomInterface(false, ip, gDefaultGroups, containerIP)
+			err := updateCustomInterface(false, ip, groups, containerIP)
 			if err != nil {
 				fmt.Println("[-] Failed to install peer "+ip, err)
 			}
