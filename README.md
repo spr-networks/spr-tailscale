@@ -23,5 +23,18 @@ To share all tailscale access with SPR devices, add the SPR devices to the 'tail
 
 ### TBD
 
-Simplify adding specific tailscale peers to custom groups. To do this currently,
-visit the `Custom Interface Access` page and update the peer IP with groups that should have access.
+Simplify adding specific tailscale peers to custom groups. To do this currently, update the config.json.
+See the  TailscalePeer struct
+
+```
+type TailscalePeer struct {
+	IP     string
+	Groups []string
+	Tags   []string //unused for now
+}
+
+type Config struct {
+	APIToken string
+	Peers    []TailscalePeer
+}
+```
