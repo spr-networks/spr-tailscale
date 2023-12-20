@@ -17,7 +17,7 @@ if [ -z "$SPR_API_TOKEN" ]; then
   exit 1
 fi
 
-echo SPR_API_TOKEN=$SPR_API_TOKEN > $SUPERDIR/configs/plugins/tailscale/config.sh
+echo SPR_API_TOKEN=$SPR_API_TOKEN > $SUPERDIR/configs/plugins/spr-tailscale/config.sh
 
 # Prompt for TAILSCALE_AUTH_KEY
 echo "Please enter your TAILSCALE_AUTH_KEY:"
