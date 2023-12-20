@@ -17,7 +17,9 @@ if [ -z "$SPR_API_TOKEN" ]; then
   exit 1
 fi
 
-echo SPR_API_TOKEN=$SPR_API_TOKEN > $SUPERDIR/configs/plugins/spr-tailscale/config.sh
+mkdir -p $SUPERDIR/configs/plugins/tailscale 
+
+echo SPR_API_TOKEN=$SPR_API_TOKEN > $SUPERDIR/configs/plugins/tailscale/config.sh
 
 # Prompt for TAILSCALE_AUTH_KEY
 echo "Please enter your TAILSCALE_AUTH_KEY:"
@@ -28,10 +30,9 @@ if [ -z "$TAILSCALE_AUTH_KEY" ]; then
   exit 1
 fi
 
-mkdir -p $SUPERDIR/configs/plugins/spr-tailscale 
-echo TAILSCALE_AUTH_KEY=$TAILSCALE_AUTH_KEY >> $SUPERDIR/configs/plugins/spr-tailscale/config.sh
+echo TAILSCALE_AUTH_KEY=$TAILSCALE_AUTH_KEY >> $SUPERDIR/configs/plugins/tailscale/config.sh
 
-echo {\"APIToken\" : \"${SPR_API_TOKEN}\" } > $SUPERDIR/configs/plugins/spr-tailscale/config.json
+echo {\"APIToken\" : \"${SPR_API_TOKEN}\" } > $SUPERDIR/configs/plugins/tailscale/config.json
 
 docker compose build
 docker compose up -d
