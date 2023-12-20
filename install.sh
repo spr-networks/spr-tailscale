@@ -28,6 +28,7 @@ if [ -z "$TAILSCALE_AUTH_KEY" ]; then
   exit 1
 fi
 
+mkldir -p $SUPERDIR/configs/plugins/spr-tailscale 
 echo TAILSCALE_AUTH_KEY=$TAILSCALE_AUTH_KEY >> $SUPERDIR/configs/plugins/spr-tailscale/config.sh
 
 echo {\"APIToken\" : \"${SPR_API_TOKEN}\" } > $SUPERDIR/configs/plugins/spr-tailscale/config.json
