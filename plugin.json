@@ -6,5 +6,5 @@
   "HasUI": true,
   "SandboxedUI": false,
   "InstallTokenPath": "/configs/plugins/spr-tailscale/api-token",
-  "Enabled": true,
+  "Enabled": true
 }
