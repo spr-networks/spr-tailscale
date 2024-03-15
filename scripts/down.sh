@@ -1,4 +1,4 @@
 #!/bin/bash
-. /configs/tailscale/config.sh
+. /configs/spr-tailscale/config.sh
 
 tailscale down

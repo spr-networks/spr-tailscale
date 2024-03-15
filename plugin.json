@@ -1,0 +1,10 @@
+{
+  "Name": "spr-tailscale",
+  "ComposeFilePath": "plugins/user/spr-tailscale/docker-compose.yml",
+  "UnixPath": "/state/plugins/spr-tailscale/socket",
+  "URI": "spr-tailscale",
+  "HasUI": true,
+  "SandboxedUI": false,
+  "InstallTokenPath": "/configs/plugins/spr-tailscale/api-token",
+  "Enabled": true,
+}

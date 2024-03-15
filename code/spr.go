@@ -40,7 +40,7 @@ type Config struct {
 var gConfig = Config{}
 
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
-var ConfigFile = TEST_PREFIX + "/configs/tailscale/config.json"
+var ConfigFile = TEST_PREFIX + "/configs/spr-tailscale/config.json"
 var gDefaultGroups = []string{"tailnet"}
 
 type DeviceEntry struct {

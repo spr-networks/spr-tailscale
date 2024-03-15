@@ -6,8 +6,8 @@ x-logging:
 
 
 services:
-  tailscale-plugin:
-    container_name: tailscale-plugin
+  spr-tailscale:
+    container_name: spr-tailscale:
     build:
       context: .
     logging: *default-logging
@@ -22,14 +22,14 @@ services:
     networks:
       tailscalenet:
     volumes:
-      - "${SUPERDIR}./state/plugins/tailscale:/state/plugins/tailscale"
+      - "${SUPERDIR}./state/plugins/spr-tailscale:/state/plugins/spr-tailscale"
       - "${SUPERDIR}./state/public/:/state/public/:ro"
       - "${SUPERDIR}./state/api/:/state/api/:ro"
-      - "${SUPERDIR}./configs/plugins/tailscale:/configs/tailscale"
-      - "${SUPERDIR}./state/plugins/tailscale/varlib:/var/lib"
+      - "${SUPERDIR}./configs/plugins/spr-tailscale:/configs/spr-tailscale"
+      - "${SUPERDIR}./state/plugins/spr-tailscale/varlib:/var/lib"
       - /dev/net/tun:/dev/net/tun
 
 networks:
   tailscalenet:
     driver_opts:
-      com.docker.network.bridge.name: tailscale
+      com.docker.network.bridge.name: spr-tailscale

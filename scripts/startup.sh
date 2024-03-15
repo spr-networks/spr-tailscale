@@ -1,8 +1,8 @@
 #!/bin/bash
 set -a
-. /configs/tailscale/config.sh
+. /configs/spr-tailscale/config.sh
 
-TAILSCALE_STATE_DIR=/state/tailscale/tailscaled
+TAILSCALE_STATE_DIR=/state/spr-tailscale/tailscaled
 
 tailscaled & >$TAILSCALE_STATE_DIR/stdout.log 2>$TAILSCALE_STATE_DIR/stderr.log
 

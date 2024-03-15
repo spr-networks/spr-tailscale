@@ -1,5 +1,5 @@
 #!/bin/bash
-. /configs/tailscale/config.sh
+. /configs/spr-tailscale/config.sh
 
 TAILSCALE_ARGS="--json --timeout ${TAILSCALE_TIMEOUT:-5s}"
 if [ -n "$TAILSCALE_LOGIN_SERVER" ]; then
