@@ -18,8 +18,8 @@ import (
 	"tailscale.com/client/tailscale"
 )
 
-var UNIX_PLUGIN_LISTENER = "/state/plugins/tailscale/tailscale_plugin"
-var UNIX_TAILSCALE_SOCK = "/state/plugins/tailscale/tailscaled/tailscaled.sock"
+var UNIX_PLUGIN_LISTENER = "/state/plugins/spr-tailscale/tailscale_plugin"
+var UNIX_TAILSCALE_SOCK = "/state/plugins/spr-tailscale/tailscaled/tailscaled.sock"
 var TailscaleInterface = "tailscale0"
 
 // the name of the interface from the docker network (see docker-compose.yml)
