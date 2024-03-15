@@ -7,7 +7,7 @@ x-logging:
 
 services:
   spr-tailscale:
-    container_name: spr-tailscale:
+    container_name: spr-tailscale
     build:
       context: .
     logging: *default-logging
