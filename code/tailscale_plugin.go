@@ -18,7 +18,7 @@ import (
 	"tailscale.com/client/tailscale"
 )
 
-var UNIX_PLUGIN_LISTENER = "/state/plugins/spr-tailscale/tailscale_plugin"
+var UNIX_PLUGIN_LISTENER = "/state/plugins/spr-tailscale/socket"
 var UNIX_TAILSCALE_SOCK = "/state/plugins/spr-tailscale/tailscaled/tailscaled.sock"
 var TailscaleInterface = "tailscale0"
 

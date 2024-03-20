@@ -325,7 +325,7 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 
 		//validate that cfg has TailscaleAuthKey set
 		if cfg.TailscaleAuthKey == "" {
-			http.Error(w, "Missing Auth Key", 400)
+			http.Error(w, "Missing Tailscale Auth Key", 400)
 			return
 		}
 
@@ -337,7 +337,6 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 
 		gConfig.TailscaleAuthKey = cfg.TailscaleAuthKey
 		gConfig.APIToken = string(tokendata)
-
 	}
 }
 
