@@ -232,7 +232,7 @@ func main() {
 
 	unix_plugin_router := mux.NewRouter().StrictSlash(true)
 
-	//unix_plugin_router.HandleFunc("/config", pluginGetConfig).Methods("GET")
+	unix_plugin_router.HandleFunc("/config", plugin.handleGetSetConfig).Methods("GET", "PUT")
 	//unix_plugin_router.HandleFunc("/reauth", plugin.handleReauth).Methods("POST")
 	unix_plugin_router.HandleFunc("/status", plugin.handleGetStatus).Methods("GET")
 	unix_plugin_router.HandleFunc("/peers", plugin.handleGetPeers).Methods("GET")

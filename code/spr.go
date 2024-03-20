@@ -33,14 +33,16 @@ type TailscalePeer struct {
 }
 
 type Config struct {
-	APIToken string
-	Peers    []TailscalePeer
+	TailscaleAuthKey string
+	APIToken         string
+	Peers            []TailscalePeer
 }
 
 var gConfig = Config{}
 
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
 var ConfigFile = TEST_PREFIX + "/configs/spr-tailscale/config.json"
+var PluginTokenPath = TEST_PREFIX + "/configs/plugins/spr-tailscale/api-token"
 var gDefaultGroups = []string{"tailnet"}
 
 type DeviceEntry struct {
@@ -301,6 +303,42 @@ func loadConfig() error {
 		}
 	}
 	return nil
+}
+
+func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Request) {
+	Configmtx.RLock()
+	defer Configmtx.RUnlock()
+
+	if r.Method == http.MethodGet {
+		if jsonErr := json.NewEncoder(w).Encode(gConfig); jsonErr != nil {
+			http.Error(w, jsonErr.Error(), 400)
+			return
+		}
+
+	} else {
+		//write the config
+		cfg := Config{}
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		//validate that cfg has TailscaleAuthKey set
+		if cfg.TailscaleAuthKey == "" {
+			http.Error(w, "Missing Auth Key", 400)
+			return
+		}
+
+		tokendata, err := ioutil.ReadFile(PluginTokenPath)
+		if err == nil {
+			http.Error(w, "Missing SPR API Key", 400)
+			return
+		}
+
+		gConfig.TailscaleAuthKey = cfg.TailscaleAuthKey
+		gConfig.APIToken = string(tokendata)
+
+	}
 }
 
 func advertiseRoutes(routes []string) error {
