@@ -8,8 +8,9 @@ x-logging:
 services:
   spr-tailscale:
     container_name: spr-tailscale
+    #image: ghcr.io/spr-networks/spr-tailscale
     build:
-      context: .
+      context: "${BUILDCTX}."
     logging: *default-logging
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
