@@ -177,6 +177,22 @@ func (tsp *tailscalePlugin) handleSetSPRPeer(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if input_peer.IP == "" {
+		http.Error(w, "Need a Peer IP", 400)
+		return
+	}
+
+	//make sure to include Tailnet in the groups
+	found := false
+	for _, entry := range input_peer.Groups {
+		if entry == gDefaultGroups[0] {
+			found = true
+		}
+	}
+	if !found {
+		input_peer.Groups = append(input_peer.Groups, gDefaultGroups[0])
+	}
+
 	Configmtx.Lock()
 	defer Configmtx.Unlock()
 
@@ -192,7 +208,13 @@ func (tsp *tailscalePlugin) handleSetSPRPeer(w http.ResponseWriter, r *http.Requ
 
 			if matched {
 				gConfig.Peers[idx] = input_peer
-				writeConfigLocked()
+				err := writeConfigLocked()
+				if err == nil {
+					rebuildState()
+				} else {
+					http.Error(w, err.Error(), 400)
+					return
+				}
 				return
 			}
 		}
@@ -212,7 +234,13 @@ func (tsp *tailscalePlugin) handleSetSPRPeer(w http.ResponseWriter, r *http.Requ
 
 			if matched {
 				gConfig.Peers = append(gConfig.Peers[:idx], gConfig.Peers[idx+1:]...)
-				writeConfigLocked()
+				err := writeConfigLocked()
+				if err == nil {
+					rebuildState()
+				} else {
+					http.Error(w, err.Error(), 400)
+					return
+				}
 				return
 			}
 		}

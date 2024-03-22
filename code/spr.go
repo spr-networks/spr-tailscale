@@ -31,7 +31,7 @@ var Configmtx sync.RWMutex
 type TailscalePeer struct {
 	NodeKey  string
 	IP       string
-	Policies []string
+	Policies []string //unused for now
 	Groups   []string
 	Tags     []string //unused for now
 }
