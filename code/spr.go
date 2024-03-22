@@ -132,7 +132,7 @@ func getSPRFirewallConfig() (FirewallConfig, error) {
 
 	gw, err := getGateway()
 	if err != nil {
-		fmt.Println("[-] Could not retrieve API from gateway address")
+		fmt.Println("[-] Could not retrieve SPR API from gateway address")
 		return firewallConfig, err
 	}
 
@@ -259,7 +259,7 @@ func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDs
 
 	gw, err := getGateway()
 	if err != nil {
-		fmt.Println("[-] Could not retrieve API from gateway address")
+		fmt.Println("[-] Could not retrieve SPR API from gateway address")
 		return err
 	}
 
@@ -305,17 +305,81 @@ func loadConfig() error {
 	return nil
 }
 
+func writeConfigLocked() error {
+	file, _ := json.MarshalIndent(gConfig, "", " ")
+	return ioutil.WriteFile(ConfigFile, file, 0600)
+}
+
+func installFirewallRule() {
+
+	if os.Getenv("VIRTUAL_SPR") == "1" {
+		return
+	}
+
+	// if we're not in virtual mode, we need to add ourselve's to SPR's container
+	// firewall rules
+
+	gw, err := getGateway()
+	if err != nil {
+		fmt.Println("[-] Could not retrieve SPR API from gateway address")
+		return
+	}
+	containerIP := getContainerIP()
+
+	payload := map[string]interface{}{
+		"SrcIP":     containerIP,
+		"Interface": "spr-tailscale",
+		"Policies":  []string{"wan", "dns", "api"},
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Println("Error marshalling payload:", err)
+		os.Exit(1)
+	}
+
+	api := "http://" + gw + "/firewall/custom_interface"
+
+	// Creating the request
+	req, err := http.NewRequest("PUT", api, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		fmt.Println("[-] Error creating request:", err)
+		return
+	}
+
+	// Adding required headers
+	req.Header.Add("Authorization", "Bearer "+gConfig.APIToken)
+	req.Header.Add("Content-Type", "application/json")
+
+	// Making the request
+	client := &http.Client{}
+	defer client.CloseIdleConnections()
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("[-] Error making container interface request:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("[-] Failed to install container firewall rule")
+		return
+	}
+}
+
 func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Request) {
-	Configmtx.RLock()
-	defer Configmtx.RUnlock()
 
 	if r.Method == http.MethodGet {
+		Configmtx.RLock()
+		defer Configmtx.RUnlock()
 		if jsonErr := json.NewEncoder(w).Encode(gConfig); jsonErr != nil {
 			http.Error(w, jsonErr.Error(), 400)
 			return
 		}
 
 	} else {
+		Configmtx.Lock()
+		defer Configmtx.Unlock()
 		//write the config
 		cfg := Config{}
 		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
@@ -337,6 +401,13 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 
 		gConfig.TailscaleAuthKey = cfg.TailscaleAuthKey
 		gConfig.APIToken = string(tokendata)
+		err = writeConfigLocked()
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		installFirewallRule()
 	}
 }
 

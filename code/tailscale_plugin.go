@@ -174,6 +174,12 @@ func logRequest(handler http.Handler) http.Handler {
 }
 
 func getGateway() (string, error) {
+	//first, check if it is virtual spr, if so, return localhost
+	// as we're running in the service:base network namespace.
+	if os.Getenv("VIRTUAL_SPR") == "1" {
+		return "127.0.0.1", nil
+	}
+
 	cmd := exec.Command("ip", "route")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -256,7 +262,6 @@ func main() {
 	rebuildState()
 
 	unix_plugin_router := mux.NewRouter().StrictSlash(true)
-
 
 	unix_plugin_router.HandleFunc("/config", plugin.handleGetSetConfig).Methods("GET", "PUT")
 	//unix_plugin_router.HandleFunc("/reauth", plugin.handleReauth).Methods("POST")
