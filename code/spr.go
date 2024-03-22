@@ -579,7 +579,7 @@ func rebuildPostrouting() {
 	ruleExistsCmd := "nft list ruleset | grep 'oifname \"tailscale0\" masquerade'"
 	if !commandOutputContains(ruleExistsCmd, "tailscale0") {
 		// Rule does not exist, so add it
-		addRuleCmd := "nft add rule inet nat POSTROUTING oif \"tailscale0\" masquerade"
+		addRuleCmd := "nft add rule inet nat POSTROUTING oifname \"tailscale0\" masquerade"
 		if err := exec.Command("sh", "-c", addRuleCmd).Run(); err != nil {
 			fmt.Printf("Failed to add rule: %s\nError: %s\n", addRuleCmd, err)
 			return
@@ -594,7 +594,6 @@ func commandOutputContains(commandStr, searchStr string) bool {
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("Error executing command: %s\n", err)
 		return false
 	}
 	return strings.Contains(out.String(), searchStr)
