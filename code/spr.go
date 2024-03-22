@@ -568,7 +568,7 @@ func rebuildPostrouting() {
 	chainExistsCmd := "nft list chains | grep 'POSTROUTING'"
 	if !commandOutputContains(chainExistsCmd, "POSTROUTING") {
 		// Chain does not exist, so add it
-		addChainCmd := "nft add chain inet filter POSTROUTING { type nat hook postrouting priority 100 \\; }"
+		addChainCmd := "nft add chain inet nat POSTROUTING { type nat hook postrouting priority 100 \\; }"
 		if err := exec.Command("sh", "-c", addChainCmd).Run(); err != nil {
 			fmt.Printf("Failed to add chain: %s\nError: %s\n", addChainCmd, err)
 			return
@@ -579,7 +579,7 @@ func rebuildPostrouting() {
 	ruleExistsCmd := "nft list ruleset | grep 'oifname \"tailscale0\" masquerade'"
 	if !commandOutputContains(ruleExistsCmd, "tailscale0") {
 		// Rule does not exist, so add it
-		addRuleCmd := "nft add rule inet filter POSTROUTING oif \"tailscale0\" masquerade"
+		addRuleCmd := "nft add rule inet nat POSTROUTING oif \"tailscale0\" masquerade"
 		if err := exec.Command("sh", "-c", addRuleCmd).Run(); err != nil {
 			fmt.Printf("Failed to add rule: %s\nError: %s\n", addRuleCmd, err)
 			return
