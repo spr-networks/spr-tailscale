@@ -210,9 +210,7 @@ func (tsp *tailscalePlugin) handleSetSPRPeer(w http.ResponseWriter, r *http.Requ
 				gConfig.Peers[idx] = input_peer
 				err := writeConfigLocked()
 				if err == nil {
-					Configmtx.Unlock()
-					rebuildState()
-					Configmtx.Lock()
+					go rebuildState()
 				} else {
 					http.Error(w, err.Error(), 400)
 					return
@@ -238,9 +236,7 @@ func (tsp *tailscalePlugin) handleSetSPRPeer(w http.ResponseWriter, r *http.Requ
 				gConfig.Peers = append(gConfig.Peers[:idx], gConfig.Peers[idx+1:]...)
 				err := writeConfigLocked()
 				if err == nil {
-					Configmtx.Unlock()
-					rebuildState()
-					Configmtx.Lock()
+					go rebuildState()
 				} else {
 					http.Error(w, err.Error(), 400)
 					return
