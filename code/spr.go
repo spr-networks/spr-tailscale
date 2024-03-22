@@ -405,8 +405,10 @@ func collectPeerIPs() ([]string, []string) {
 	entries := []string{}
 	keys := []string{}
 	for nodeKey, peer := range tsdStatus.Peer {
-		keys = append(keys, nodeKey.String())
-		entries = append(entries, peer.TailscaleIPs[0].String())
+		if len(peer.TailscaleIPs) > 0 {
+			keys = append(keys, nodeKey.String())
+			entries = append(entries, peer.TailscaleIPs[0].String())
+		}
 	}
 
 	return entries, keys
