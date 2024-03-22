@@ -257,9 +257,6 @@ func main() {
 
 	unix_plugin_router := mux.NewRouter().StrictSlash(true)
 
-	// map /ui to /ui on fs
-	spa := spaHandler{staticPath: "/ui", indexPath: "index.html"}
-	unix_plugin_router.PathPrefix("/").Handler(spa)
 
 	unix_plugin_router.HandleFunc("/config", plugin.handleGetSetConfig).Methods("GET", "PUT")
 	//unix_plugin_router.HandleFunc("/reauth", plugin.handleReauth).Methods("POST")
@@ -268,6 +265,10 @@ func main() {
 
 	unix_plugin_router.HandleFunc("/up", plugin.handleUp).Methods("PUT")
 	unix_plugin_router.HandleFunc("/down", plugin.handleDown).Methods("PUT")
+
+	// map /ui to /ui on fs
+	spa := spaHandler{staticPath: "/ui", indexPath: "index.html"}
+	unix_plugin_router.PathPrefix("/").Handler(spa)
 
 	os.Remove(UNIX_PLUGIN_LISTENER)
 	unixPluginListener, err := net.Listen("unix", UNIX_PLUGIN_LISTENER)
