@@ -27,9 +27,10 @@ var TEST_PREFIX = os.Getenv("TEST_PREFIX")
 var Configmtx sync.RWMutex
 
 type TailscalePeer struct {
-	IP     string
-	Groups []string
-	Tags   []string //unused for now
+	IP       string
+	Policies []string
+	Groups   []string
+	Tags     []string //unused for now
 }
 
 type Config struct {
@@ -76,6 +77,7 @@ type CustomInterfaceRule struct {
 	Interface string
 	SrcIP     string
 	RouteDst  string
+	Policies  []string
 	Groups    []string
 	Tags      []string //unused for now
 }
@@ -110,7 +112,7 @@ func (c *CustomInterfaceRule) Equals(other *CustomInterfaceRule) bool {
 }
 
 type FirewallConfig struct {
-	//we only care about tehse.
+	//we only care about these.
 	CustomInterfaceRules []CustomInterfaceRule
 }
 
@@ -238,13 +240,14 @@ func getSPRRoutes() ([]string, error) {
 	return connected_subnets, nil
 }
 
-func updateCustomInterface(doDelete bool, SrcIP string, Groups []string, RouteDst string) error {
+func updateCustomInterface(doDelete bool, SrcIP string, Policies []string, Groups []string, RouteDst string) error {
 	custom_interface_rule := CustomInterfaceRule{
 		BaseRule{"GeneratedTailscale-" + SrcIP,
 			false},
 		gSPRTailscaleInterface,
 		SrcIP,
 		RouteDst,
+		Policies,
 		Groups,
 		[]string{},
 	}
@@ -472,7 +475,7 @@ func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string) {
 
 			if !found_peer {
 				//scanned tailscale ips, IP is not known, remove it
-				err := updateCustomInterface(true, entry.SrcIP, entry.Groups, containerIP)
+				err := updateCustomInterface(true, entry.SrcIP, entry.Policies, entry.Groups, containerIP)
 				if err != nil {
 					fmt.Println("[-] Failed to delete peer "+entry.SrcIP, err)
 				}
@@ -506,7 +509,7 @@ func getContainerIP() string {
 	return ""
 }
 
-func matchPeerConfig(crule CustomInterfaceRule, ip string) (bool, []string, []string) {
+func matchPeerConfig(crule CustomInterfaceRule, ip string) (bool, []string, []string, []string) {
 	//this routine returns false if peer is configured and different than the interface rule
 	Configmtx.RLock()
 	defer Configmtx.RUnlock()
@@ -516,18 +519,23 @@ func matchPeerConfig(crule CustomInterfaceRule, ip string) (bool, []string, []st
 			ret := slices.Compare(peer.Groups, crule.Groups)
 			if ret == 0 {
 				ret = slices.Compare(peer.Tags, crule.Tags)
-				return ret == 0, peer.Groups, peer.Tags
+				if ret == 0 {
+					ret = slices.Compare(peer.Policies, crule.Policies)
+					return ret == 0, peer.Groups, peer.Tags, peer.Policies
+				}
 			}
-			return ret == 0, peer.Groups, peer.Tags
+			return ret == 0, peer.Groups, peer.Tags, peer.Policies
 		}
 	}
 
 	//we return true if not in peers
-	return true, []string{}, []string{}
+	return true, []string{}, []string{}, []string{}
 }
 
 func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
 	containerIP := getContainerIP()
+
+	policies := []string{}
 
 	groups := gDefaultGroups
 	for _, ip := range tailscaleIPs {
@@ -535,11 +543,11 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
 		for _, crule := range fw.CustomInterfaceRules {
 			if crule.Interface == gSPRTailscaleInterface && crule.SrcIP == ip {
 
-				ok, new_groups, _ := matchPeerConfig(crule, ip)
+				ok, new_groups, _, _ := matchPeerConfig(crule, ip)
 				if !ok {
 					//delete peer and reinstall
 					groups = new_groups
-					err := updateCustomInterface(true, crule.SrcIP, crule.Groups, containerIP)
+					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, containerIP)
 					if err != nil {
 						fmt.Println("[-] Failed to delete peer "+crule.SrcIP, err)
 					}
@@ -555,7 +563,7 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
 
 		if !found_peer {
 			//install this peer
-			err := updateCustomInterface(false, ip, groups, containerIP)
+			err := updateCustomInterface(false, ip, policies, groups, containerIP)
 			if err != nil {
 				fmt.Println("[-] Failed to install peer "+ip, err)
 			}
@@ -604,7 +612,7 @@ func rebuildState() {
 
 	fw, err := getSPRFirewallConfig()
 	if err != nil {
-		fmt.Println("[-] Failed to load fw config")
+		fmt.Println("[-] Failed to load fw config", err.Error())
 		return
 	}
 
