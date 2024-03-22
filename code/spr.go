@@ -48,7 +48,7 @@ var TAILSCALE_INTERFACE = "spr-tailscale"
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
 var ConfigFile = TEST_PREFIX + "/configs/spr-tailscale/config.json"
 var TailscaleEnvFile = TEST_PREFIX + "/configs/spr-tailscale/config.sh"
-var PluginTokenPath = TEST_PREFIX + "/configs/plugins/spr-tailscale/api-token"
+var PluginTokenPath = TEST_PREFIX + "/configs/spr-tailscale/api-token"
 var gDefaultGroups = []string{"tailnet"}
 
 type DeviceEntry struct {
@@ -159,12 +159,21 @@ func getSPRFirewallConfig() (FirewallConfig, error) {
 	token := gConfig.APIToken
 	Configmtx.RUnlock()
 
+	if gConfig.APIToken == "" {
+		fmt.Println("[-] Missing auth token")
+		return firewallConfig, fmt.Errorf("missing auth token")
+	}
+
 	req.Header.Add("Authorization", "Bearer "+token)
 
 	resp, err := cli.Do(req)
 	if err != nil {
 		fmt.Println("request failed", err)
 		return firewallConfig, err
+	}
+
+	if resp.StatusCode != 200 {
+		return firewallConfig, fmt.Errorf("API error", resp.StatusCode)
 	}
 
 	defer resp.Body.Close()
