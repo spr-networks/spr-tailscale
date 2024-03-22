@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -211,6 +212,30 @@ func routeTracker() {
 
 }
 
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
+
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	path, err := filepath.Abs(r.URL.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	path = filepath.Join(h.staticPath, path)
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.FileServer(http.Dir(h.staticPath)).ServeHTTP(w, r)
+}
+
 func main() {
 	loadConfig()
 
@@ -231,6 +256,10 @@ func main() {
 	rebuildState()
 
 	unix_plugin_router := mux.NewRouter().StrictSlash(true)
+
+	// map /ui to /ui on fs
+	spa := spaHandler{staticPath: "/ui", indexPath: "index.html"}
+	unix_plugin_router.PathPrefix("/").Handler(spa)
 
 	unix_plugin_router.HandleFunc("/config", plugin.handleGetSetConfig).Methods("GET", "PUT")
 	//unix_plugin_router.HandleFunc("/reauth", plugin.handleReauth).Methods("POST")
