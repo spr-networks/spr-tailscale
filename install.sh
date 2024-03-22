@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# Command line install alternative to the UI
 echo "Please enter your SPR path (/home/spr/super/)"
 read -r SUPERDIR
 
@@ -17,7 +17,7 @@ if [ -z "$SPR_API_TOKEN" ]; then
   exit 1
 fi
 
-mkdir -p $SUPERDIR/configs/plugins/spr-tailscale 
+mkdir -p $SUPERDIR/configs/plugins/spr-tailscale
 
 echo SPR_API_TOKEN=$SPR_API_TOKEN > $SUPERDIR/configs/plugins/spr-tailscale/config.sh
 
@@ -36,12 +36,12 @@ echo {\"APIToken\" : \"${SPR_API_TOKEN}\" } > $SUPERDIR/configs/plugins/spr-tail
 
 docker compose build
 docker compose up -d
-CONTAINER_IP=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "tailscale-plugin")
+CONTAINER_IP=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "spr-tailscale")
 API=127.0.0.1
 
 curl "http://${API}/firewall/custom_interface" \
 -H "Authorization: Bearer ${SPR_API_TOKEN}" \
 -X 'PUT' \
---data-raw "{\"SrcIP\":\"${CONTAINER_IP}\",\"Interface\":\"tailscale\",\"Groups\":[\"wan\",\"dns\",\"api\"]}"
+--data-raw "{\"SrcIP\":\"${CONTAINER_IP}\",\"Interface\":\"tailscale\",\"Policies\":[\"wan\",\"dns\",\"api\"]}"
 
 docker compose restart

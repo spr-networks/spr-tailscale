@@ -26,10 +26,13 @@ services:
       - "${SUPERDIR}./state/plugins/spr-tailscale:/state/plugins/spr-tailscale"
       - "${SUPERDIR}./state/public/:/state/public/:ro"
       - "${SUPERDIR}./state/api/:/state/api/:ro"
+      - "${SUPERDIR}./configs/base/config.sh:/configs/base/config.sh:ro"
       - "${SUPERDIR}./configs/plugins/spr-tailscale:/configs/spr-tailscale"
       - "${SUPERDIR}./state/plugins/spr-tailscale/varlib:/var/lib"
       - /dev/net/tun:/dev/net/tun
 
+# Note, if updating the bridge name,
+# // also make an udpate in spr.go in TAILSCALE_INTERFACE
 networks:
   tailscalenet:
     driver_opts:
