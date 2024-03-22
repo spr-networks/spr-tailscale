@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -21,12 +22,14 @@ import (
 
 import (
 	"github.com/spr-networks/sprbus"
+	"tailscale.com/client/tailscale"
 )
 
 var TEST_PREFIX = os.Getenv("TEST_PREFIX")
 var Configmtx sync.RWMutex
 
 type TailscalePeer struct {
+	NodeKey  string
 	IP       string
 	Policies []string
 	Groups   []string
@@ -40,10 +43,6 @@ type Config struct {
 }
 
 var gConfig = Config{}
-
-// when updating this value, make sure to update docker-compose.yml also
-// under networks:
-var TAILSCALE_INTERFACE = "spr-tailscale"
 
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
 var ConfigFile = TEST_PREFIX + "/configs/spr-tailscale/config.json"
@@ -345,7 +344,7 @@ func installFirewallRule() {
 
 	payload := map[string]interface{}{
 		"SrcIP":     containerIP,
-		"Interface": TAILSCALE_INTERFACE,
+		"Interface": gSPRTailscaleInterface,
 		"Policies":  []string{"wan", "dns", "api"},
 	}
 	payloadBytes, err := json.Marshal(payload)
@@ -384,98 +383,49 @@ func installFirewallRule() {
 	}
 }
 
-func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method == http.MethodGet {
-		Configmtx.RLock()
-		defer Configmtx.RUnlock()
-		if jsonErr := json.NewEncoder(w).Encode(gConfig); jsonErr != nil {
-			http.Error(w, jsonErr.Error(), 400)
-			return
-		}
-
-	} else {
-		Configmtx.Lock()
-		defer Configmtx.Unlock()
-		//write the config
-		cfg := Config{}
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-
-		//validate that cfg has TailscaleAuthKey set
-		if cfg.TailscaleAuthKey == "" {
-			http.Error(w, "Missing Tailscale Auth Key", 400)
-			return
-		}
-
-		tokendata, err := ioutil.ReadFile(PluginTokenPath)
-		if err != nil {
-			http.Error(w, "Missing SPR API Key", 400)
-			return
-		}
-
-		gConfig.TailscaleAuthKey = cfg.TailscaleAuthKey
-		gConfig.APIToken = string(tokendata)
-		err = writeConfigLocked()
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-
-		//also write the tailscale config now
-		err = ioutil.WriteFile(TailscaleEnvFile, []byte("TAILSCALE_AUTH_KEY="+gConfig.TailscaleAuthKey), 0600)
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-
-		// configure this container into SPR
-		installFirewallRule()
-	}
-}
-
 func advertiseRoutes(routes []string) error {
 	//this script inherits auth key parameters and so on
 	return exec.Command("/scripts/up.sh", "--advertise-routes="+strings.Join(routes, ",")).Run()
 }
 
-func collectPeerIPs() []string {
-	cmd := exec.Command("tailscale", "status")
-	stdout, err := cmd.Output()
-	if err != nil {
+// returns a matching list of ips and node keys
+func collectPeerIPs() ([]string, []string) {
+
+	client := tailscale.LocalClient{
+		Socket:        UNIX_TAILSCALE_SOCK,
+		UseSocketOnly: true,
+	}
+
+	tsdStatus, tsdErr := client.Status(context.Background())
+	if tsdErr != nil {
 		fmt.Println("[-] Failed to get status")
-		return []string{}
+		return []string{}, []string{}
 	}
 
-	lines := strings.Split(string(stdout), "\n")
-
-	var entries []string
-	for _, line := range lines {
-		parts := strings.Fields(line)
-		if len(parts) > 0 {
-			entries = append(entries, parts[0])
-		}
+	entries := []string{}
+	keys := []string{}
+	for nodeKey, peer := range tsdStatus.Peer {
+		keys = append(keys, nodeKey.String())
+		entries = append(entries, peer.TailscaleIPs[0].String())
 	}
 
-	if len(entries) > 1 {
-		return entries[1:]
-	}
-
-	return []string{}
+	return entries, keys
 }
 
-func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string) {
+func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string) {
 	containerIP := getContainerIP()
+
+	//tbd, check for node keys not matching IP?
 
 	for _, entry := range fw.CustomInterfaceRules {
 		if entry.Interface == gSPRTailscaleInterface {
 			found_peer := false
 			//skip non cg nat addrs. we're looking for peers
+			// actual range is 100.64... 100.127.255.255 but we dont care
 			if entry.SrcIP[:4] != "100." {
 				continue
 			}
+
 			for _, ip := range tailscaleIPs {
 				if ip == entry.SrcIP {
 					found_peer = true
@@ -518,13 +468,16 @@ func getContainerIP() string {
 	return ""
 }
 
-func matchPeerConfig(crule CustomInterfaceRule, ip string) (bool, []string, []string, []string) {
+func matchPeerConfig(crule CustomInterfaceRule, ip string, nodeKey string) (bool, []string, []string, []string) {
 	//this routine returns false if peer is configured and different than the interface rule
 	Configmtx.RLock()
 	defer Configmtx.RUnlock()
 
 	for _, peer := range gConfig.Peers {
 		if peer.IP == ip {
+			if peer.NodeKey != nodeKey {
+				return false, peer.Groups, peer.Tags, peer.Policies
+			}
 			ret := slices.Compare(peer.Groups, crule.Groups)
 			if ret == 0 {
 				ret = slices.Compare(peer.Tags, crule.Tags)
@@ -541,18 +494,19 @@ func matchPeerConfig(crule CustomInterfaceRule, ip string) (bool, []string, []st
 	return true, []string{}, []string{}, []string{}
 }
 
-func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
+func installNewPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string) {
 	containerIP := getContainerIP()
 
 	policies := []string{}
 
 	groups := gDefaultGroups
-	for _, ip := range tailscaleIPs {
+	for idx, ip := range tailscaleIPs {
 		found_peer := false
+		node_key := nodeKeys[idx]
 		for _, crule := range fw.CustomInterfaceRules {
 			if crule.Interface == gSPRTailscaleInterface && crule.SrcIP == ip {
 
-				ok, new_groups, _, _ := matchPeerConfig(crule, ip)
+				ok, new_groups, _, _ := matchPeerConfig(crule, ip, node_key)
 				if !ok {
 					//delete peer and reinstall
 					groups = new_groups
@@ -626,12 +580,13 @@ func rebuildState() {
 	}
 
 	//first half, get known tailscale peers, and advertise them to SPR
-	tailscaleIPs := collectPeerIPs()
+	tailscaleIPs, nodeKeys := collectPeerIPs()
 
 	//first remove any peers that dont belong
-	cleanOldPeers(fw, tailscaleIPs)
+	cleanOldPeers(fw, tailscaleIPs, nodeKeys)
 
-	installNewPeers(fw, tailscaleIPs)
+	//then install the new ones.
+	installNewPeers(fw, tailscaleIPs, nodeKeys)
 
 	//second half, get routes for tailscale and advertise them.
 	routes, err := getSPRRoutes()

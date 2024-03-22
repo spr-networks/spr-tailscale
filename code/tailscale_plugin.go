@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -20,12 +21,14 @@ import (
 )
 
 var UNIX_PLUGIN_LISTENER = "/state/plugins/spr-tailscale/socket"
+
+// Optionally we can adjust this with TS_SOCKET https://tailscale.com/kb/1282/docker#ts_socket
 var UNIX_TAILSCALE_SOCK = "/run/tailscale/tailscaled.sock"
 var TailscaleInterface = "tailscale0"
 
 // the name of the interface from the docker network (see docker-compose.yml)
 // which is visible outside of the container.
-var gSPRTailscaleInterface = "tailscale"
+var gSPRTailscaleInterface = "spr-tailscale"
 
 //https://pkg.go.dev/tailscale.com/client/tailscale
 
@@ -49,7 +52,7 @@ func (tsp *tailscalePlugin) handleGetPeers(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if jsonErr := json.NewEncoder(w).Encode(tsdStatus.Peers()); jsonErr != nil {
+	if jsonErr := json.NewEncoder(w).Encode(tsdStatus.Peer); jsonErr != nil {
 		httpInternalError("Encoding tailscale peers failed", jsonErr, w)
 		return
 	}
@@ -166,6 +169,120 @@ func (tsp *tailscalePlugin) handleDown(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func (tsp *tailscalePlugin) handleSetSPRPeer(w http.ResponseWriter, r *http.Request) {
+
+	input_peer := TailscalePeer{}
+	if err := json.NewDecoder(r.Body).Decode(&input_peer); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	Configmtx.Lock()
+	defer Configmtx.Unlock()
+
+	/*
+	   type TailscalePeer struct {
+	   	NodeKey  string
+	   	IP       string
+	   	Policies []string
+	   	Groups   []string
+	   	Tags     []string //unused for now
+	*/
+
+	if r.Method == http.MethodPut {
+		//replace or add a new peer
+		for idx, peer := range gConfig.Peers {
+			matched := false
+			if input_peer.NodeKey != "" && peer.NodeKey == input_peer.NodeKey {
+				matched = true
+			} else if input_peer.IP == peer.IP {
+				matched = true
+			}
+
+			if matched {
+				gConfig.Peers[idx] = input_peer
+				writeConfigLocked()
+				return
+			}
+		}
+
+		//append if not found
+		gConfig.Peers = append(gConfig.Peers, input_peer)
+		return
+	} else if r.Method == http.MethodDelete {
+		//delete the peer
+		for idx, peer := range gConfig.Peers {
+			matched := false
+			if input_peer.NodeKey != "" && peer.NodeKey == input_peer.NodeKey {
+				matched = true
+			} else if input_peer.IP == peer.IP {
+				matched = true
+			}
+
+			if matched {
+				gConfig.Peers = append(gConfig.Peers[:idx], gConfig.Peers[idx+1:]...)
+				writeConfigLocked()
+				return
+			}
+		}
+	}
+	http.Error(w, "Not found", 404)
+	return
+
+}
+
+func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method == http.MethodGet {
+		Configmtx.RLock()
+		defer Configmtx.RUnlock()
+		if jsonErr := json.NewEncoder(w).Encode(gConfig); jsonErr != nil {
+			http.Error(w, jsonErr.Error(), 400)
+			return
+		}
+
+	} else {
+		Configmtx.Lock()
+		defer Configmtx.Unlock()
+		//write the config
+		cfg := Config{}
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		//validate that cfg has TailscaleAuthKey set
+		if cfg.TailscaleAuthKey == "" {
+			http.Error(w, "Missing Tailscale Auth Key", 400)
+			return
+		}
+
+		tokendata, err := ioutil.ReadFile(PluginTokenPath)
+		if err != nil {
+			http.Error(w, "Missing SPR API Key", 400)
+			return
+		}
+
+		gConfig.TailscaleAuthKey = cfg.TailscaleAuthKey
+		gConfig.APIToken = string(tokendata)
+		err = writeConfigLocked()
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		//also write the tailscale config now
+		err = ioutil.WriteFile(TailscaleEnvFile, []byte("TAILSCALE_AUTH_KEY="+gConfig.TailscaleAuthKey), 0600)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		// configure this container into SPR
+		installFirewallRule()
+	}
+}
+
 func logRequest(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("%s %s %s\n", r.RemoteAddr, r.Method, r.URL)
@@ -268,8 +385,10 @@ func main() {
 	unix_plugin_router.HandleFunc("/status", plugin.handleGetStatus).Methods("GET")
 	unix_plugin_router.HandleFunc("/peers", plugin.handleGetPeers).Methods("GET")
 
+	unix_plugin_router.HandleFunc("/setSPRPeer", plugin.handleSetSPRPeer).Methods("DELETE", "PUT")
+
 	unix_plugin_router.HandleFunc("/up", plugin.handleUp).Methods("PUT")
-	unix_plugin_router.HandleFunc("/down", plugin.handleDown).Methods("PUT")
+	//unix_plugin_router.HandleFunc("/down", plugin.handleDown).Methods("PUT")
 
 	// map /ui to /ui on fs
 	spa := spaHandler{staticPath: "/ui", indexPath: "index.html"}

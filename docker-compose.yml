@@ -32,7 +32,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 
 # Note, if updating the bridge name,
-# // also make an udpate in spr.go in TAILSCALE_INTERFACE
+# // also make an udpate in tailscale_plugin.go in gSPRTailscaleInterface
 networks:
   tailscalenet:
     driver_opts:
