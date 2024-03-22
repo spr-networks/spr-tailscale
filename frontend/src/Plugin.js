@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   Badge,
+  BadgeText,
   Box,
   Button,
+  ButtonIcon,
   ButtonText,
   HStack,
   Input, InputField,
@@ -18,6 +20,8 @@ import {
   ModalFooter,
   Checkbox,
   IconButton,
+  TrashIcon,
+  Heading,
   useDisclosure
  } from '@gluestack-ui/themed';
 
@@ -34,28 +38,18 @@ import {
 import { api } from './API'
 
 const StatusInfo = ({ status }) => {
+  const [details, setDetails] = useState(false)
+  const handleToggleDetails = (event) => {
+    setDetails((prevDetails) => !prevDetails)
+  };
+
   return (
     <Box borderWidth={1} borderRadius="md" p={4} mb={4}>
+      <Heading size="lg">SPR Node Details</Heading>
       <VStack alignItems="flex-start" spacing={2}>
         <HStack>
           <Text fontWeight="bold">Backend State:</Text>
           <Text>{status.BackendState}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Version:</Text>
-          <Text>{status.Version}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Public Key:</Text>
-          <Text>{status.Self.PublicKey}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Hostname:</Text>
-          <Text>{status.Self.HostName}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">DNS Name:</Text>
-          <Text>{status.Self.DNSName}</Text>
         </HStack>
         <HStack>
           <Text fontWeight="bold">Tailscale IPs:</Text>
@@ -66,67 +60,139 @@ const StatusInfo = ({ status }) => {
           </VStack>
         </HStack>
         <HStack>
-          <Text fontWeight="bold">Addresses:</Text>
-          <VStack alignItems="flex-start">
-            {status.Self.Addrs.map((addr, index) => (
-              <Text key={index}>{addr}</Text>
-            ))}
-          </VStack>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Relay:</Text>
-          <Text>{status.Self.Relay}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Last Handshake:</Text>
-          <Text>{status.Self.LastHandshake}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Online:</Text>
-          <Badge colorScheme={status.Self.Online ? "green" : "red"}>
-            {status.Self.Online ? "Online" : "Offline"}
+          <Badge size="lg" action={status.Self.Online ? "success" : "warning"}>
+            <BadgeText size="lg">{status.Self.Online ? "Online" : "Offline"}</BadgeText>
           </Badge>
         </HStack>
+        {details ? (
+          <>
+          <HStack>
+            <Text fontWeight="bold">Version:</Text>
+            <Text>{status.Version}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Public Key:</Text>
+            <Text>{status.Self.PublicKey}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Hostname:</Text>
+            <Text>{status.Self.HostName}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">DNS Name:</Text>
+            <Text>{status.Self.DNSName}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Addresses:</Text>
+              <VStack alignItems="flex-start">
+                {status.Self.Addrs.map((addr, index) => (
+                  <Text key={index}>{addr}</Text>
+                ))}
+              </VStack>)
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Relay:</Text>
+            <Text>{status.Self.Relay}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Last Handshake:</Text>
+            <Text>{status.Self.LastHandshake}</Text>
+          </HStack>
+          </>)
+          : null }
+        <Button action="primary" size="sm" onPress={handleToggleDetails}>
+          <ButtonText> {details ? "Hide Details" :  "Show Details"}</ButtonText>
+        </Button>
       </VStack>
     </Box>
   );
 };
 
 
-const PeerInfo = ({ device }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
+const defaultGroup = 'tailnet'
+
+const PeerInfo = ({ configGroups, showAlert, device }) => {
   const [policies, setPolicies] = useState([]);
-  const [groups, setGroups] = useState([]);
+  const [groups, setGroups] = useState(configGroups);
   const [tags, setTags] = useState([]);
 
-  const handleInputChange = (setter) => (event) => {
-    const input = event.target.value;
-    if (input.endsWith(",")) {
-      const value = input.slice(0, -1).trim();
-      if (value) {
-        setter((prevValues) => [...prevValues, value]);
-      }
-      event.target.value = "";
-    }
+  const [details, setDetails] = useState(false)
+
+  const [groupInput, setGroupInput] = useState("");
+
+  const handleInputChange = (event) => {
+    setGroupInput(event.target.value.toLowerCase().trim());
   };
 
-  const handleDeleteItem = (setter) => (index) => {
-    setter((prevValues) => prevValues.filter((_, i) => i !== index));
+  const handleToggleDetails = (event) => {
+    setDetails((prevDetails) => !prevDetails)
   };
+
+
+  const handleAddGroup = () => {
+    let group = groupInput.toLowerCase().trim()
+    if (group == "") {
+      return
+    }
+
+    if (groups.includes(group)) {
+      //already have it, dont dup
+      return
+    }
+
+    let newGroups = groups.concat(group)
+    api.put('/plugins/spr-tailscale/setSPRPeer', {
+      IP: device.TailscaleIPs[0],
+      NodeKey: device.PublicKey.split(":")[1],
+      Groups: newGroups
+    }).then((result) => {
+      setGroups((prevGroups) => [...prevGroups, group]);
+      setGroupInput("");
+    }).catch(async (err) => {
+      if (err.response) {
+        let msg = await err.response.text() // setup already done
+        showAlert('Error', `Could not set groups: ${msg}.`);
+      } else {
+        showAlert('Error', `Failed to fetch tailscale config`)
+      }
+    })
+
+  };
+
+  const handleDeleteGroup = (index) => {
+    if (groups[index] == defaultGroup) {
+      return
+    }
+    let newGroups = groups.filter((_, i) => i !== index)
+
+    //make the API call
+    api.put('/plugins/spr-tailscale/setSPRPeer', {
+      IP: device.TailscaleIPs[0],
+      NodeKey: device.PublicKey.split(":")[1],
+      Groups: newGroups
+    }).then((result) => {
+      setGroups(newGroups);
+    }).catch(async (err) => {
+      if (err.response) {
+        let msg = await err.response.text() // setup already done
+        showAlert('Error', `Could not set groups: ${msg}.`);
+      } else {
+        showAlert('Error', `Failed to fetch tailscale config`)
+      }
+    })
+  };
+
   return (
     <Box borderWidth={1} borderRadius="md" p={4} mb={4}>
-      <Button onClick={() => setIsModalOpen(true)}>Configure</Button>
-
       <VStack alignItems="flex-start" spacing={2}>
         <HStack>
           <Text fontWeight="bold">DNS Name:</Text>
           <Text>{device.DNSName}</Text>
         </HStack>
         <HStack>
-          <Text fontWeight="bold">Online Status:</Text>
-          <Badge colorScheme={device.Online ? "green" : "red"}>
-            {device.Online ? "Online" : "Offline"}
+          <Text fontWeight="bold">Status:</Text>
+          <Badge action={device.Online ? "success" : "warning"}>
+            <BadgeText>{device.Online ? "Online" : "Offline"}</BadgeText>
           </Badge>
         </HStack>
         <HStack>
@@ -137,41 +203,95 @@ const PeerInfo = ({ device }) => {
             ))}
           </VStack>
         </HStack>
+        {details ? (
+          <>
+          <HStack>
+            <Text fontWeight="bold">Public Key:</Text>
+            <Text>{device.PublicKey}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Hostname:</Text>
+            <Text>{device.HostName}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">OS:</Text>
+            <Text>{device.OS}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Last Seen:</Text>
+            <Text>{device.LastSeen}</Text>
+          </HStack>
+          <HStack>
+            <Text fontWeight="bold">Last Handshake:</Text>
+            <Text>{device.LastHandshake}</Text>
+          </HStack>
+          </>
+        ) : null }
+        <Button action="primary" size="sm" onPress={handleToggleDetails}>
+          <ButtonText> {details ? "Hide Details" :  "Show Details"}</ButtonText>
+        </Button>
         <HStack>
-          <Text fontWeight="bold">Public Key:</Text>
-          <Text>{device.PublicKey}</Text>
+          <Text fontWeight="bold">Groups:</Text>
+          <HStack spacing={2}>
+            {groups.map((group, index) => (
+              <Badge
+                key={index}
+                borderRadius="full"
+                variant="solid"
+                colorScheme="blue"
+                onClick={() => handleDeleteGroup(index)}
+              >
+                <BadgeText>{group}</BadgeText>
+                {group != defaultGroup ?
+                  <ButtonIcon as={TrashIcon} color="$red700" />
+                : null }
+              </Badge>
+            ))}
+          </HStack>
         </HStack>
         <HStack>
-          <Text fontWeight="bold">Hostname:</Text>
-          <Text>{device.HostName}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">OS:</Text>
-          <Text>{device.OS}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Last Seen:</Text>
-          <Text>{device.LastSeen}</Text>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Last Handshake:</Text>
-          <Text>{device.LastHandshake}</Text>
+          <Input
+            size="sm"
+          >
+          <InputField
+            placeholder="Add group..."
+            value={groupInput}
+            onChange={handleInputChange}
+          />
+          </Input>
+          <Button size="sm" onPress={handleAddGroup}>
+            <ButtonText>Add</ButtonText>
+          </Button>
         </HStack>
       </VStack>
     </Box>
   );
 };
 
-const PeerList = ({ devices }) => {
+const PeerList = ({ showAlert, devices, config }) => {
+
+
+  const getGroups = (config, device) => {
+    for (let peer of config.Peers) {
+      if (peer.IP == device.TailscaleIPs[0]) {
+        let groups = peer.Groups
+        if (!groups.includes('tailnet')) {
+          groups = ['tailnet'].concat(groups)
+        }
+        return groups
+      }
+    }
+    return ['tailnet']
+  }
+
   return (
     <Box>
       {Object.values(devices).map((device, index) => (
-        <PeerInfo key={index} device={device} />
+        <PeerInfo configGroups={getGroups(config, device)} showAlert={showAlert} key={index} device={device} />
       ))}
     </Box>
   );
 };
-
 
 
 const SPRTailscaleSetup = () => {
@@ -183,6 +303,7 @@ const SPRTailscaleSetup = () => {
 
   const [tailscalePeers, setTailscalePeers] = useState([]);
   const [tailscaleStatus, setTailscaleStatus] = useState([]);
+  const [tailscaleConfig, setTailscaleConfig] = useState({})
 
   const showAlert = (title, message) => {
     setAlertTitle(title);
@@ -190,16 +311,12 @@ const SPRTailscaleSetup = () => {
     setShowAlertDialog(true);
   };
 
-
-  useEffect(() => {
+  const getConfig = (callback) => {
     api
       .get('/plugins/spr-tailscale/config')
       .then((res) => {
         let result = JSON.parse(res)
-        if (result.TailscaleAuthKey) {
-          setTailscaleAuthKey(result.TailscaleAuthKey)
-          setConfigured(true)
-        }
+        callback(result)
       })
       .catch(async (err) => {
         if (err.response) {
@@ -209,41 +326,50 @@ const SPRTailscaleSetup = () => {
           showAlert('Error', `Failed to fetch tailscale config`)
         }
       })
+  }
 
+  useEffect(() => {
+    getConfig((result) => {
+      if (result.TailscaleAuthKey) {
+        setTailscaleAuthKey(result.TailscaleAuthKey)
+        setTailscaleConfig(result)
+        setConfigured(true)
+      }
+    })
+
+    api
+      .get('/plugins/spr-tailscale/peers')
+      .then((res) => {
+        let result = JSON.parse(res)
+        if (result) {
+          setTailscalePeers(result)
+        }
+      })
+      .catch(async (err) => {
+        if (err.response) {
+          let msg = await err.response.text()
+          showAlert('Error', `Could not retrieve tasilscale peers: ${msg}.`);
+        } else {
+          showAlert('Error', `Failed to fetch tailscale peers`)
+        }
+      })
 
       api
-        .get('/plugins/spr-tailscale/peers')
+        .get('/plugins/spr-tailscale/status')
         .then((res) => {
           let result = JSON.parse(res)
           if (result) {
-            setTailscalePeers(result)
+            setTailscaleStatus(result)
           }
         })
         .catch(async (err) => {
           if (err.response) {
             let msg = await err.response.text()
-            showAlert('Error', `Could not retrieve tasilscale peers: ${msg}.`);
+            showAlert('Error', `Could not retrieve tasilscale status: ${msg}.`);
           } else {
-            showAlert('Error', `Failed to fetch tailscale peers`)
+            showAlert('Error', `Failed to fetch tailscale status`)
           }
         })
-
-        api
-          .get('/plugins/spr-tailscale/status')
-          .then((res) => {
-            let result = JSON.parse(res)
-            if (result) {
-              setTailscaleStatus(result)
-            }
-          })
-          .catch(async (err) => {
-            if (err.response) {
-              let msg = await err.response.text()
-              showAlert('Error', `Could not retrieve tasilscale status: ${msg}.`);
-            } else {
-              showAlert('Error', `Failed to fetch tailscale status`)
-            }
-          })
 
   }, [])
 
@@ -276,12 +402,17 @@ const SPRTailscaleSetup = () => {
     >
       {configured ?
         <VStack>
-          { tailscaleStatus != null ?
-            <StatusInfo status={tailscaleStatus} />
+          { tailscaleStatus.Self != null ?
+            (
+              <>
+              <Heading size="md">Tailscale Node</Heading>
+              <StatusInfo status={tailscaleStatus} />
+              </>
+            )
             : <Text> Could not get tailscale status </Text>
           }
-          <Text> Peers: </Text>
-          <PeerList devices={tailscalePeers}/>
+          <Heading size="md">Tailscale Peers</Heading>
+          <PeerList config={tailscaleConfig} showAlert={showAlert} devices={tailscalePeers}/>
         </VStack>
           :
       (
