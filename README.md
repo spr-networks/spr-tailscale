@@ -42,3 +42,10 @@ type Config struct {
 	Peers    []TailscalePeer
 }
 ```
+
+
+UI TBD:
+
+- list devices that are in the 'tailnet' group or have a shared group with tailscale
+- let a user add a tailscale peer to "join" / have access to SPR
+	- set group, policy, tags

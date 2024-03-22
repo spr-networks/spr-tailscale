@@ -180,15 +180,6 @@ func (tsp *tailscalePlugin) handleSetSPRPeer(w http.ResponseWriter, r *http.Requ
 	Configmtx.Lock()
 	defer Configmtx.Unlock()
 
-	/*
-	   type TailscalePeer struct {
-	   	NodeKey  string
-	   	IP       string
-	   	Policies []string
-	   	Groups   []string
-	   	Tags     []string //unused for now
-	*/
-
 	if r.Method == http.MethodPut {
 		//replace or add a new peer
 		for idx, peer := range gConfig.Peers {
