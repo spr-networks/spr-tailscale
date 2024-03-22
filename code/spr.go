@@ -40,8 +40,13 @@ type Config struct {
 
 var gConfig = Config{}
 
+// when updating this value, make sure to update docker-compose.yml also
+// under networks:
+var TAILSCALE_INTERFACE = "spr-tailscale"
+
 var DevicesPublicConfigFile = TEST_PREFIX + "/state/public/devices-public.json"
 var ConfigFile = TEST_PREFIX + "/configs/spr-tailscale/config.json"
+var TailscaleEnvFile = TEST_PREFIX + "/configs/spr-tailscale/config.sh"
 var PluginTokenPath = TEST_PREFIX + "/configs/plugins/spr-tailscale/api-token"
 var gDefaultGroups = []string{"tailnet"}
 
@@ -328,7 +333,7 @@ func installFirewallRule() {
 
 	payload := map[string]interface{}{
 		"SrcIP":     containerIP,
-		"Interface": "spr-tailscale",
+		"Interface": TAILSCALE_INTERFACE,
 		"Policies":  []string{"wan", "dns", "api"},
 	}
 	payloadBytes, err := json.Marshal(payload)
@@ -407,6 +412,14 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 			return
 		}
 
+		//also write the tailscale config now
+		err = ioutil.WriteFile(ConfigFile, []byte("TAILSCALE_AUTH_KEY="+gConfig.TailscaleAuthKey), 0600)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		// configure this container into SPR
 		installFirewallRule()
 	}
 }
@@ -551,10 +564,30 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
 }
 
 func rebuildPostrouting() {
-	//TbD
-	//  nft add chain ip filter POSTROUTING { type nat hook postrouting priority 100 \; }
-	//  nft add rule ip filter POSTROUTING oif "tailscale0" masquerade
+	// Define the commands to be executed
 
+	// Check if the POSTROUTING chain already exists
+	cmdCheck := exec.Command("sh", "-c", "nft list chains | grep 'POSTROUTING'")
+	var out bytes.Buffer
+	cmdCheck.Stdout = &out
+	err := cmdCheck.Run()
+
+	if err != nil || !strings.Contains(out.String(), "POSTROUTING") {
+
+		commands := []string{
+			"nft add chain ip filter POSTROUTING { type nat hook postrouting priority 100 \\; }",
+			"nft add rule ip filter POSTROUTING oif \"tailscale0\" masquerade",
+		}
+
+		for _, cmdStr := range commands {
+			cmd := exec.Command("sh", "-c", cmdStr)
+			err := cmd.Run()
+			if err != nil {
+				fmt.Printf("Failed to execute command: %s\nError: %s\n", cmdStr, err)
+				return
+			}
+		}
+	}
 }
 
 func rebuildState() {
