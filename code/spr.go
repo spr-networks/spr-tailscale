@@ -564,32 +564,41 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string) {
 }
 
 func rebuildPostrouting() {
-	// Define the commands to be executed
-
 	// Check if the POSTROUTING chain already exists
-	cmdCheck := exec.Command("sh", "-c", "nft list chains | grep 'POSTROUTING'")
-	var out bytes.Buffer
-	cmdCheck.Stdout = &out
-	err := cmdCheck.Run()
-
-	if err != nil || !strings.Contains(out.String(), "POSTROUTING") {
-
-		commands := []string{
-			"nft add chain ip filter POSTROUTING { type nat hook postrouting priority 100 \\; }",
-			"nft add rule ip filter POSTROUTING oif \"tailscale0\" masquerade",
+	chainExistsCmd := "nft list chains | grep 'POSTROUTING'"
+	if !commandOutputContains(chainExistsCmd, "POSTROUTING") {
+		// Chain does not exist, so add it
+		addChainCmd := "nft add chain ip filter POSTROUTING { type nat hook postrouting priority 100 \\; }"
+		if err := exec.Command("sh", "-c", addChainCmd).Run(); err != nil {
+			fmt.Printf("Failed to add chain: %s\nError: %s\n", addChainCmd, err)
+			return
 		}
+	}
 
-		for _, cmdStr := range commands {
-			cmd := exec.Command("sh", "-c", cmdStr)
-			err := cmd.Run()
-			if err != nil {
-				fmt.Printf("Failed to execute command: %s\nError: %s\n", cmdStr, err)
-				return
-			}
+	// Check if the masquerade rule for tailscale0 already exists
+	ruleExistsCmd := "nft list ruleset | grep 'oifname \"tailscale0\" masquerade'"
+	if !commandOutputContains(ruleExistsCmd, "tailscale0") {
+		// Rule does not exist, so add it
+		addRuleCmd := "nft add rule ip filter POSTROUTING oif \"tailscale0\" masquerade"
+		if err := exec.Command("sh", "-c", addRuleCmd).Run(); err != nil {
+			fmt.Printf("Failed to add rule: %s\nError: %s\n", addRuleCmd, err)
+			return
 		}
 	}
 }
 
+// commandOutputContains executes a shell command and checks if the output contains the specified string.
+func commandOutputContains(commandStr, searchStr string) bool {
+	cmd := exec.Command("sh", "-c", commandStr)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		fmt.Printf("Error executing command: %s\n", err)
+		return false
+	}
+	return strings.Contains(out.String(), searchStr)
+}
 func rebuildState() {
 
 	rebuildPostrouting()
