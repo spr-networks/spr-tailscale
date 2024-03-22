@@ -411,7 +411,7 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 		}
 
 		tokendata, err := ioutil.ReadFile(PluginTokenPath)
-		if err == nil {
+		if err != nil {
 			http.Error(w, "Missing SPR API Key", 400)
 			return
 		}
