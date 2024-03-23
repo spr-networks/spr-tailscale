@@ -60,6 +60,10 @@ const StatusInfo = ({ status }) => {
                   <Text>{status.Self.HostName}</Text>
                 </HStack>
                 <HStack>
+                  <Text fontWeight="bold">DNS:</Text>
+                  <Text>{status.Self.DNSName}</Text>
+                </HStack>
+                <HStack>
                   <Text fontWeight="bold">Tailscale IPs:</Text>
                   <VStack alignItems="flex-start">
                     {status.Self.TailscaleIPs.map((ip, index) => (

@@ -49,4 +49,5 @@ if [ "$ret" -ne "0" ]; then
   echo "consider running ./base/docker_nftables_setup.sh"
   echo "since iptables has been disabled for docker in the"
   echo "SPR installer"
+  exit $ret
 fi
