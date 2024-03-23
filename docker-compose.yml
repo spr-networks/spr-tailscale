@@ -9,7 +9,7 @@ services:
     container_name: spr-tailscale
     image: ghcr.io/spr-networks/spr-tailscale:${RELEASE_VERSION:-latest}${RELEASE_CHANNEL:-}
     build:
-      context: "${BUILDCTX}."
+      context: "${BUILDCTX:-.}"
     logging: *default-logging
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
