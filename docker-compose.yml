@@ -4,11 +4,10 @@ x-logging:
   &default-logging
   driver: journald
 
-
 services:
   spr-tailscale:
     container_name: spr-tailscale
-    #image: ghcr.io/spr-networks/spr-tailscale
+    image: ghcr.io/spr-networks/spr-tailscale:${RELEASE_VERSION:-latest}${RELEASE_CHANNEL:-}
     build:
       context: "${BUILDCTX}."
     logging: *default-logging
