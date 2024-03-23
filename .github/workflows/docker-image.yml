@@ -47,6 +47,8 @@ jobs:
         run: |
           ./build_docker_compose.sh \
             --set "*.platform=linux/amd64,linux/arm64" \
+            --set "*.tags=ghcr.io/spr-networks/spr-tailscale:${RELEASE_VERSION:-latest}" \
+            --set "*.tags=ghcr.io/spr-networks/spr-tailscale:latest" \
             `[[ "${{ github.event_name }}" = "workflow_run" && ("${{ github.ref_name }}" = "main")  || ( ! -z $RELEASE_CHANNEL && ("${{ github.event_name }}" = "push")) ]] && echo "--push"` || exit 1
       - name: Get images from docker-compose.yml
         id: get-images
