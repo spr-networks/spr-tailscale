@@ -6,5 +6,6 @@
   "HasUI": true,
   "SandboxedUI": false,
   "InstallTokenPath": "/configs/plugins/spr-tailscale/api-token",
+  "ScopedPaths": ["/firewall/config:r", "/firewall/custom_interface"],
   "Enabled": true
 }
