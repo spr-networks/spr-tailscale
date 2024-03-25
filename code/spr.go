@@ -537,11 +537,17 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string
 }
 
 func rebuildPostrouting() {
+
+	if os.Getenv("VIRTUAL_SPR") == "1" {
+		fmt.Printf("[-] Postrouting for VITUAL_SPR not implemented yet")
+		return
+	}
+
 	// Check if the POSTROUTING chain already exists
 	chainExistsCmd := "nft list chains | grep 'POSTROUTING'"
 	if !commandOutputContains(chainExistsCmd, "POSTROUTING") {
 		// Chain does not exist, so add it
-		addChainCmd := "nft add chain inet nat POSTROUTING { type nat hook postrouting priority 100 \\; }"
+		addChainCmd := "nft add chain ip nat POSTROUTING { type nat hook postrouting priority 100 \\; }"
 		if err := exec.Command("sh", "-c", addChainCmd).Run(); err != nil {
 			fmt.Printf("Failed to add chain: %s\nError: %s\n", addChainCmd, err)
 			return
@@ -552,7 +558,7 @@ func rebuildPostrouting() {
 	ruleExistsCmd := "nft list ruleset | grep 'oifname \"tailscale0\" masquerade'"
 	if !commandOutputContains(ruleExistsCmd, "tailscale0") {
 		// Rule does not exist, so add it
-		addRuleCmd := "nft add rule inet nat POSTROUTING oifname \"tailscale0\" masquerade"
+		addRuleCmd := "nft add rule ip nat POSTROUTING oifname \"tailscale0\" masquerade"
 		if err := exec.Command("sh", "-c", addRuleCmd).Run(); err != nil {
 			fmt.Printf("Failed to add rule: %s\nError: %s\n", addRuleCmd, err)
 			return
