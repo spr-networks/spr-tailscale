@@ -31,7 +31,7 @@ var Configmtx sync.RWMutex
 type TailscalePeer struct {
 	NodeKey  string
 	IP       string
-	Policies []string //unused for now
+	Policies []string
 	Groups   []string
 	Tags     []string //unused for now
 }
@@ -508,10 +508,11 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string
 		for _, crule := range fw.CustomInterfaceRules {
 			if crule.Interface == gSPRTailscaleInterface && crule.SrcIP == ip {
 
-				ok, new_groups, _, _ := matchPeerConfig(crule, ip, node_key)
+				ok, new_groups, _, new_policies := matchPeerConfig(crule, ip, node_key)
 				if !ok {
 					//delete peer and reinstall
 					groups = new_groups
+					policies = new_policies
 					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, containerIP)
 					if err != nil {
 						fmt.Println("[-] Failed to delete peer "+crule.SrcIP, err)
@@ -519,6 +520,7 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string
 					break
 				} else {
 					//peer already established with correct groups
+					//and policies
 					found_peer = true
 					break
 				}

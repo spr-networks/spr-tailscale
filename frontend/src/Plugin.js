@@ -54,10 +54,26 @@ const PeerList = ({ showAlert, devices, config }) => {
     return ['tailnet']
   }
 
+  const getPolicies = (config, device) => {
+    if (!config.Peers) {
+      return []
+    }
+    for (let peer of config.Peers) {
+      if (peer.IP == device.TailscaleIPs[0]) {
+        let policies = peer.Policies
+        if (policies == null) {
+          return []
+        }
+        return policies
+      }
+    }
+    return []
+  }
+
   return (
     <Box>
       {Object.values(devices).map((device, index) => (
-        <PeerInfo key={"peer-" + index} configGroups={getGroups(config, device)} showAlert={showAlert} key={index} device={device} />
+        <PeerInfo key={"peer-" + index} configPolicies={getPolicies(config, device)} configGroups={getGroups(config, device)} showAlert={showAlert} key={index} device={device} />
       ))}
     </Box>
   );

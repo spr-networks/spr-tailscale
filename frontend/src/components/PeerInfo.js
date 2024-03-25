@@ -6,6 +6,11 @@ import {
   Button,
   ButtonIcon,
   ButtonText,
+  Checkbox,
+  CheckboxIcon,
+  CheckIcon,
+  CheckboxIndicator,
+  CheckboxLabel,
   HStack,
   Input, InputField,
   Text,
@@ -18,7 +23,6 @@ import {
   ModalCloseButton,
   ModalBody,
   ModalFooter,
-  Checkbox,
   IconButton,
   Icon,
   InfoIcon,
@@ -31,15 +35,25 @@ import {
   Divider
 } from '@gluestack-ui/themed';
 
-import { api } from '../API'
+import { api } from '../API';
 
-const defaultGroup = 'tailnet'
+const defaultGroup = 'tailnet';
+const defaultPolicies = ['api']//, 'dns', 'lan_upstream'];
 
-const PeerInfo = ({ configGroups, showAlert, device }) => {
-  const [policies, setPolicies] = useState([]);
+const policyName = {
+  api: 'API Access'
+}
+/*
+//these policies come later
+  wan: 'Internet Access',
+  dns: 'DNS Resolution',
+  lan_upstream: 'Upstream Private Networks',
+};
+*/
+
+const PeerInfo = ({ configGroups, configPolicies, showAlert, device }) => {
   const [groups, setGroups] = useState(configGroups);
-  const [tags, setTags] = useState([]);
-
+  const [policies, setPolicies] = useState(configPolicies);
   const [groupInput, setGroupInput] = useState("");
 
   const handleInputChange = (event) => {
@@ -47,42 +61,41 @@ const PeerInfo = ({ configGroups, showAlert, device }) => {
   };
 
   const handleAddGroup = () => {
-    let group = groupInput.toLowerCase().trim()
-    if (group == "") {
-      return
+    let group = groupInput.toLowerCase().trim();
+    if (group === "") {
+      return;
     }
 
     if (groups.includes(group)) {
-      //already have it, dont dup
-      return
+      // Already have it, don't duplicate
+      return;
     }
 
-    let newGroups = groups.concat(group)
+    let newGroups = [...groups, group];
     api.put('/plugins/spr-tailscale/setSPRPeer', {
       IP: device.TailscaleIPs[0],
       NodeKey: device.PublicKey.split(":")[1],
       Groups: newGroups
     }).then((result) => {
-      setGroups((prevGroups) => [...prevGroups, group]);
+      setGroups(newGroups);
       setGroupInput("");
     }).catch(async (err) => {
       if (err.response) {
-        let msg = await err.response.text() // setup already done
+        let msg = await err.response.text(); // setup already done
         showAlert('Error', `Could not set groups: ${msg}.`);
       } else {
-        showAlert('Error', `Failed to fetch tailscale config`)
+        showAlert('Error', `Failed to fetch tailscale config`);
       }
-    })
-
+    });
   };
 
   const handleDeleteGroup = (index) => {
-    if (groups[index] == defaultGroup) {
-      return
+    if (groups[index] === defaultGroup) {
+      return;
     }
-    let newGroups = groups.filter((_, i) => i !== index)
+    let newGroups = groups.filter((_, i) => i !== index);
 
-    //make the API call
+    // Make the API call
     api.put('/plugins/spr-tailscale/setSPRPeer', {
       IP: device.TailscaleIPs[0],
       NodeKey: device.PublicKey.split(":")[1],
@@ -91,12 +104,37 @@ const PeerInfo = ({ configGroups, showAlert, device }) => {
       setGroups(newGroups);
     }).catch(async (err) => {
       if (err.response) {
-        let msg = await err.response.text() // setup already done
+        let msg = await err.response.text(); // setup already done
         showAlert('Error', `Could not set groups: ${msg}.`);
       } else {
-        showAlert('Error', `Failed to fetch tailscale config`)
+        showAlert('Error', `Failed to fetch tailscale config`);
       }
-    })
+    });
+  };
+
+  const handlePolicyChange = (policy) => {
+    let newPolicies;
+    if (policies.includes(policy)) {
+      newPolicies = policies.filter((p) => p !== policy);
+    } else {
+      newPolicies = [...policies, policy];
+    }
+
+    // Make the API call
+    api.put('/plugins/spr-tailscale/setSPRPeer', {
+      IP: device.TailscaleIPs[0],
+      NodeKey: device.PublicKey.split(":")[1],
+      Policies: newPolicies
+    }).then((result) => {
+      setPolicies(newPolicies);
+    }).catch(async (err) => {
+      if (err.response) {
+        let msg = await err.response.text(); // setup already done
+        showAlert('Error', `Could not set policies: ${msg}.`);
+      } else {
+        showAlert('Error', `Failed to fetch tailscale config`);
+      }
+    });
   };
 
   return (
@@ -162,7 +200,6 @@ const PeerInfo = ({ configGroups, showAlert, device }) => {
           </HStack>
         </VStack>
 
-
         <HStack>
           <Text fontWeight="bold">Groups:</Text>
           <HStack spacing={2}>
@@ -175,27 +212,44 @@ const PeerInfo = ({ configGroups, showAlert, device }) => {
                 onClick={() => handleDeleteGroup(index)}
               >
                 <BadgeText>{group}</BadgeText>
-                {group != defaultGroup ?
+                {group !== defaultGroup && (
                   <ButtonIcon as={TrashIcon} color="$red700" />
-                : null }
+                )}
               </Badge>
             ))}
           </HStack>
         </HStack>
         <HStack>
-          <Input
-            size="md"
-          >
-          <InputField
-            value={groupInput}
-            onChange={handleInputChange}
-            onSubmitEditing={handleAddGroup}
-          />
+          <Input size="md">
+            <InputField
+              value={groupInput}
+              onChange={handleInputChange}
+              onSubmitEditing={handleAddGroup}
+            />
           </Input>
           <Button size="sm" onPress={handleAddGroup}>
             <ButtonIcon as={AddIcon} />
           </Button>
         </HStack>
+
+        { policies ?
+          <HStack alignItems="flex-start" space="xs">
+            <Text fontWeight="bold">Policies:</Text>
+            {Object.entries(policyName).map(([policy, name]) => (
+              <Checkbox
+                key={policy}
+                isChecked={policies.includes(policy)}
+                onChange={() => handlePolicyChange(policy)}
+              >
+
+                <CheckboxIndicator mr="$2">
+                  <CheckboxIcon as={CheckIcon} />
+                </CheckboxIndicator>
+                <CheckboxLabel>{name}</CheckboxLabel>
+              </Checkbox>
+            ))}
+          </HStack>
+        : <Text>NO P? {JSON.stringify(policies)} x</Text> }
       </VStack>
       <Divider my="$4" />
     </Box>
