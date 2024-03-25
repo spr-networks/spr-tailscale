@@ -39,6 +39,9 @@ import PeerInfo from './components/PeerInfo'
 const PeerList = ({ showAlert, devices, config }) => {
 
   const getGroups = (config, device) => {
+    if (!config.Peers) {
+      return ['tailnet']
+    }
     for (let peer of config.Peers) {
       if (peer.IP == device.TailscaleIPs[0]) {
         let groups = peer.Groups
@@ -115,7 +118,7 @@ const SPRTailscale = () => {
       .catch(async (err) => {
         if (err.response) {
           let msg = await err.response.text()
-          showAlert('Error', `Could not retrieve tasilscale peers: ${msg}.`);
+          showAlert('Error', `Could not retrieve tailscale peers: ${msg}.`);
         } else {
           showAlert('Error', `Failed to fetch tailscale peers`)
         }
@@ -132,13 +135,76 @@ const SPRTailscale = () => {
         .catch(async (err) => {
           if (err.response) {
             let msg = await err.response.text()
-            showAlert('Error', `Could not retrieve tasilscale status: ${msg}.`);
+            showAlert('Error', `Could not retrieve tailscale status: ${msg}.`);
           } else {
             showAlert('Error', `Failed to fetch tailscale status`)
           }
         })
 
   }, [])
+
+  const getTailscaleContainerIP = (matchName, callback) => {
+    api
+      .get('/info/dockernetworks')
+      .then((docker) => {
+        let networked = docker.filter(
+          (n) => n.Options && n.Options['com.docker.network.bridge.name']
+        )
+
+        let s = []
+        let blocks = []
+        for (let n of networked) {
+          let iface = n.Options['com.docker.network.bridge.name']
+          if (n.IPAM?.Config?.[0]?.Subnet) {
+            if (iface == matchName) {
+              callback(n.IPAM.Config[0].Subnet)
+            }
+          }
+        }
+      })
+      .catch((err) => {})
+  }
+
+  const setCustomInterface = (done) => {
+
+    getTailscaleContainerIP('spr-tailscale', (subnet) => {
+      //hack
+      let [ipAddress,] = subnet.split('/');
+      let octets = ipAddress.split('.');
+      octets[3] = '2';
+      let containerIP = octets.join('.');
+
+      let crule = {
+        RuleName: 'spr-tailscale-api-access',
+        Disabled: false,
+        SrcIP: containerIP,
+        Interface: 'spr-tailscale',
+        Policies: ['wan', 'dns', 'api'],
+        Groups: [],
+        Tags: []
+      }
+
+      api.put('/firewall/custom_interface', crule)
+        .then(done)
+        .catch(async (err) => {
+          let msg = ""
+          if (err.response) {
+            msg = await err.response.text() // setup already done
+          }
+          if (!msg.includes('Duplicate rule')) {
+            showAlert('Error', `Failed to set custom firewall rule ${msg}.`);
+          } else {
+            done()
+          }
+        })
+    })
+
+  }
+
+  const handleReset = async() => {
+    setTailscaleAuthKey('')
+    setConfigured(false)
+  }
 
   const handleSetup = async () => {
     if (!tailscaleAuthKey) {
@@ -152,11 +218,18 @@ const SPRTailscale = () => {
         TailScaleAuthKey: tailscaleAuthKey
       })
       .then((res) => {
-        showAlert('Success', 'Setup completed successfully!');
-        setConfigured(true)
+        setCustomInterface(() => {
+          api.put('/plugins/spr-tailscale/up', {})
+          .then((res) => {
+            showAlert('Success', 'Setup completed successfully!');
+            setConfigured(true)
+          }).catch(err => {
+            showAlert('Error', 'Failed to bring tailscale up');
+          })
+
+        })
       })
       .catch(err => {
-        alert(err.message)
         showAlert('Error', 'An error occurred during setup. Please try again.');
       })
   };
@@ -174,6 +247,20 @@ const SPRTailscale = () => {
               <>
               <Heading my="$4" size="md">Tailscale Node</Heading>
               <StatusInfo status={tailscaleStatus} />
+              <>
+              {tailscaleStatus.Self.Online == false ?
+                <>
+                <Button onPress={handleSetup}>
+                  <ButtonText>Install Tailscale Interface</ButtonText>
+                </Button>
+                <Button onPress={handleReset}>
+                  <ButtonText>Reset Auth Key</ButtonText>
+                </Button>
+                </>
+                :
+                null
+              }
+              </>
               </>
             )
             : <Text> Could not get tailscale status </Text>

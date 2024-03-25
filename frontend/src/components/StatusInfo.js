@@ -66,7 +66,7 @@ const StatusInfo = ({ status }) => {
                 <HStack>
                   <Text fontWeight="bold">Tailscale IPs:</Text>
                   <VStack alignItems="flex-start">
-                    {status.Self.TailscaleIPs.map((ip, index) => (
+                    {status.Self.TailscaleIPs && status.Self.TailscaleIPs.map((ip, index) => (
                       <Text key={index}>{ip}</Text>
                     ))}
                   </VStack>
@@ -93,7 +93,9 @@ const StatusInfo = ({ status }) => {
         </HStack>
         <HStack>
           <Text fontWeight="bold">Tailscale IP:</Text>
-          <Text>{status.Self.TailscaleIPs[0]}</Text>
+          { status.Self.TailscaleIPs ?
+            <Text>{status.Self.TailscaleIPs[0]}</Text>
+            : null }
         </HStack>
         <HStack>
           <Badge size="lg" action={status.BackendState == "Running" ? "success" : "warning"}>
