@@ -507,6 +507,10 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string
 		node_key := nodeKeys[idx]
 		for _, crule := range fw.CustomInterfaceRules {
 			if crule.Interface == gSPRTailscaleInterface && crule.SrcIP == ip {
+				if crule.SrcIP[:4] != "100." {
+					//not a tailscale peer
+					continue
+				}
 
 				ok, new_groups, _, new_policies := matchPeerConfig(crule, ip, node_key)
 				if !ok {
