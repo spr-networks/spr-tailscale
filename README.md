@@ -52,15 +52,18 @@ See the  TailscalePeer struct
 
 ```
 type TailscalePeer struct {
-	IP     string
+	NodeKey  string
+	IP       string
 	Policies []string
-	Groups []string
-	Tags   []string //unused for now
+	Groups   []string
+	Tags     []string //unused for now
 }
 
 type Config struct {
-	APIToken string
-	Peers    []TailscalePeer
+	TailscaleAuthKey  string
+	APIToken          string
+	AdvertiseExitNode bool
+	Peers             []TailscalePeer
 }
 ```
 
