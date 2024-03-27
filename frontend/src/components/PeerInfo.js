@@ -99,7 +99,8 @@ const PeerInfo = ({ configGroups, configPolicies, showAlert, device }) => {
     api.put('/plugins/spr-tailscale/setSPRPeer', {
       IP: device.TailscaleIPs[0],
       NodeKey: device.PublicKey.split(":")[1],
-      Groups: newGroups
+      Groups: newGroups,
+      Policies: policies
     }).then((result) => {
       setGroups(newGroups);
     }).catch(async (err) => {
@@ -124,6 +125,7 @@ const PeerInfo = ({ configGroups, configPolicies, showAlert, device }) => {
     api.put('/plugins/spr-tailscale/setSPRPeer', {
       IP: device.TailscaleIPs[0],
       NodeKey: device.PublicKey.split(":")[1],
+      Groups: groups,
       Policies: newPolicies
     }).then((result) => {
       setPolicies(newPolicies);
@@ -231,7 +233,8 @@ const PeerInfo = ({ configGroups, configPolicies, showAlert, device }) => {
             <ButtonIcon as={AddIcon} />
           </Button>
         </HStack>
-
+        {/*
+          disable policies for now
         { policies ?
           <HStack alignItems="flex-start" space="xs">
             <Text fontWeight="bold">Policies:</Text>
@@ -249,7 +252,8 @@ const PeerInfo = ({ configGroups, configPolicies, showAlert, device }) => {
               </Checkbox>
             ))}
           </HStack>
-        : <Text>NO P? {JSON.stringify(policies)} x</Text> }
+        : null }
+        */}
       </VStack>
       <Divider my="$4" />
     </Box>

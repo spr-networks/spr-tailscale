@@ -13,8 +13,14 @@ import {
   Button,
   ButtonIcon,
   ButtonText,
+  Checkbox,
+  CheckboxIcon,
+  CheckIcon,
+  CheckboxIndicator,
+  CheckboxLabel,
   HStack,
-  Input, InputField,
+  Input,
+  InputField,
   Text,
   VStack,
   View,
@@ -25,7 +31,6 @@ import {
   ModalCloseButton,
   ModalBody,
   ModalFooter,
-  Checkbox,
   IconButton,
   TrashIcon,
   Heading
@@ -90,6 +95,7 @@ const SPRTailscale = () => {
   const [tailscalePeers, setTailscalePeers] = useState([]);
   const [tailscaleStatus, setTailscaleStatus] = useState([]);
   const [tailscaleConfig, setTailscaleConfig] = useState({})
+  const [exitNode, setExitNode] = useState(false)
 
   const showAlert = (title, message) => {
     setAlertTitle(title);
@@ -222,6 +228,14 @@ const SPRTailscale = () => {
     setConfigured(false)
   }
 
+  const toggleExitNode =  () => {
+
+    setExitNode((prev) => !prev)
+
+    //call setup again now
+    handleSetup()
+  }
+
   const handleSetup = async () => {
     if (!tailscaleAuthKey) {
       showAlert('Error', 'Need Tailscale auth key, generate one with Tailscale on https://login.tailscale.com/admin/settings/keys');
@@ -231,7 +245,8 @@ const SPRTailscale = () => {
     // Send setup parameters to the API
     api
       .put('/plugins/spr-tailscale/config', {
-        TailScaleAuthKey: tailscaleAuthKey
+        TailScaleAuthKey: tailscaleAuthKey,
+        AdvertiseExitNode: exitNode
       })
       .then((res) => {
         setCustomInterface(() => {
@@ -274,13 +289,25 @@ const SPRTailscale = () => {
                 </Button>
                 </>
                 :
-                null
-              }
+                <HStack my="$4" mx="$4">
+                  <Checkbox
+                    key="makeExitNode"
+                    isChecked={exitNode}
+                    onChange={() => toggleExitNode()}
+                  >
+                    <CheckboxIndicator mr="$2">
+                      <CheckboxIcon as={CheckIcon} />
+                    </CheckboxIndicator>
+                    <CheckboxLabel>Make Tailscale Exit Node</CheckboxLabel>
+                  </Checkbox>
+                </HStack>
+                }
               </>
               </>
             )
             : <Text> Could not get tailscale status </Text>
           }
+
           <Heading my="$4" size="md">Tailscale Peers</Heading>
           <PeerList config={tailscaleConfig} showAlert={showAlert} devices={tailscalePeers}/>
         </VStack>

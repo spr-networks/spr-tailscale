@@ -37,9 +37,10 @@ type TailscalePeer struct {
 }
 
 type Config struct {
-	TailscaleAuthKey string
-	APIToken         string
-	Peers            []TailscalePeer
+	TailscaleAuthKey  string
+	APIToken          string
+	AdvertiseExitNode bool
+	Peers             []TailscalePeer
 }
 
 var gConfig = Config{}

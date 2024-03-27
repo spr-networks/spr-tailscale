@@ -290,8 +290,13 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 			return
 		}
 
+		configData := []byte("TAILSCALE_AUTH_KEY=" + gConfig.TailscaleAuthKey)
+		if gConfig.AdvertiseExitNode {
+			configData = append(configData, []byte("\nTAILSCALE_EXIT_NODE=1\n")...)
+		}
+
 		//also write the tailscale config now
-		err = ioutil.WriteFile(TailscaleEnvFile, []byte("TAILSCALE_AUTH_KEY="+gConfig.TailscaleAuthKey), 0600)
+		err = ioutil.WriteFile(TailscaleEnvFile, configData, 0600)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return

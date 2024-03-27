@@ -105,7 +105,6 @@ const StatusInfo = ({ status }) => {
             <BadgeText size="lg">{status.Self.Online ? "Online" : "Offline"}</BadgeText>
           </Badge>
         </HStack>
-
       </VStack>
 
     </Box>
