@@ -23,7 +23,16 @@ The plugin runs a container with TailScale for routing between SPR and TailScale
 
 ### UI Setup
 
-Under plugins, add `https://github.com/spr-networks/spr-tailscale`
+1. Under plugins, add `https://github.com/spr-networks/spr-tailscale`.
+
+2. After the installation has finished, navigate to the bottom of the left hand menu and look for 'spr-tailscale'
+
+3. Generate a [tailscale auth key](https://login.tailscale.com/admin/settings/keys), and copy it into the UI presented
+
+4. All done, now configure TailScale Peers as needed
+
+5. If you want to grant a SPR device to all TailScale peers, add it to the `tailnet` group.
+
 
 ### Command Line Setup
 
