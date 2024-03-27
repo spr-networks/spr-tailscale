@@ -12,7 +12,7 @@ Integrate TailScale with SPR. It provides connectivity between TailScale and SPR
 
 The plugin runs a container with TailScale for routing between SPR and TailScale peers. It provides connectivity in several ways.
 
-1. Users can now assign SPR Devices to the 'tailnet' group to get access to all TailScale peers
+1. Users can now assign SPR Devices to the `tailnet` group to get access to all TailScale peers
 2. Assign a TailScale peer to a SPR Group, to give selective access from that peer to the SPR Device. It advertises a route but the firewall only allows a specific IP.
 3. Configure the container as an exit node for TailScale. This allows TailScale peers to access the SPR API as well as the internet via the container.
 
