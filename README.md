@@ -1,8 +1,6 @@
 # spr-tailscale
 
-<img width="285" alt="image" src="https://github.com/spr-networks/spr-tailscale/assets/37549748/f469024a-8a37-424a-8f9c-48b9789f4e08">
-
-![image](https://github.com/spr-networks/spr-tailscale/assets/37549748/6bbe7856-141a-466a-ac62-4e76c6e3802e)
+<img width="1105" alt="image" src="https://github.com/spr-networks/spr-tailscale/assets/37549748/cbd99b74-c830-41cb-a8ee-754ff6eab65d">
 
 ## About 
 
