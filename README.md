@@ -1,5 +1,7 @@
 # spr-tailscale
 
+![image](https://github.com/spr-networks/spr-tailscale/assets/37549748/6bbe7856-141a-466a-ac62-4e76c6e3802e)
+
 ## About 
 
 This plugin integrates TailScale with SPR. It allows TailScale access to SPR devices and vice versa.
