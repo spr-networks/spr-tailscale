@@ -4,6 +4,7 @@
   "UnixPath": "/state/plugins/spr-tailscale/socket",
   "URI": "spr-tailscale",
   "HasUI": true,
+  "HasTopology": true,
   "SandboxedUI": false,
   "InstallTokenPath": "/configs/plugins/spr-tailscale/api-token",
   "ScopedPaths": ["/firewall/config:r", "/firewall/custom_interface"],
