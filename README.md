@@ -6,7 +6,7 @@
 
 Integrate Tailscale with SPR. It provides connectivity between Tailscale and SPR devices using SPR's Microsegmentation.
 
-<img width="1192" alt="image" src="https://github.com/spr-networks/spr-tailscale/assets/37549748/5fc95691-41f2-49f5-ae06-594dd5b41e3c">
+<img width="956" height="869" alt="image" src="https://github.com/user-attachments/assets/70aea334-00bf-44f9-b481-df65359d97fd" />
 
 ## Overview
 
