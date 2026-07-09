@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -54,6 +55,81 @@ func (tsp *tailscalePlugin) handleGetPeers(w http.ResponseWriter, r *http.Reques
 
 	if jsonErr := json.NewEncoder(w).Encode(tsdStatus.Peer); jsonErr != nil {
 		httpInternalError("Encoding tailscale peers failed", jsonErr, w)
+		return
+	}
+}
+
+type TopoNode struct {
+	ID       string
+	Kind     string
+	Name     string
+	IP       string `json:",omitempty"`
+	ConnType string `json:",omitempty"`
+	Online   bool
+}
+
+type TopoEdge struct {
+	From  string
+	To    string
+	Layer string
+	Kind  string
+}
+
+type Topology struct {
+	Nodes []TopoNode
+	Edges []TopoEdge
+}
+
+func (tsp *tailscalePlugin) handleGetTopology(w http.ResponseWriter, r *http.Request) {
+	tsp.clientMtx.Lock()
+	defer tsp.clientMtx.Unlock()
+
+	tsdStatus, tsdErr := tsp.tsdClient.Status(r.Context())
+	if tsdErr != nil {
+		httpInternalError("Getting tailscale status failed", tsdErr, w)
+		return
+	}
+
+	topo := Topology{
+		Nodes: []TopoNode{{ID: "root", ConnType: "wireguard", Online: true}},
+		Edges: []TopoEdge{},
+	}
+	for _, peer := range tsdStatus.Peer {
+		id := string(peer.ID)
+		if id == "" {
+			id = peer.PublicKey.String()
+		}
+
+		name := peer.HostName
+		if name == "" && peer.DNSName != "" {
+			name = strings.SplitN(peer.DNSName, ".", 2)[0]
+		}
+		if peer.ExitNodeOption || peer.ExitNode {
+			name += " (exit node)"
+		}
+
+		ip := ""
+		if len(peer.TailscaleIPs) > 0 {
+			ip = peer.TailscaleIPs[0].String()
+		}
+
+		topo.Nodes = append(topo.Nodes, TopoNode{
+			ID:       id,
+			Kind:     "device",
+			Name:     name,
+			IP:       ip,
+			ConnType: "wireguard",
+			Online:   peer.Online,
+		})
+		topo.Edges = append(topo.Edges, TopoEdge{From: "root", To: id, Layer: "l1", Kind: "wireguard"})
+	}
+
+	sort.Slice(topo.Nodes, func(i, j int) bool { return topo.Nodes[i].Name < topo.Nodes[j].Name })
+	sort.Slice(topo.Edges, func(i, j int) bool { return topo.Edges[i].To < topo.Edges[j].To })
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(topo); err != nil {
+		httpInternalError("Encoding tailscale topology failed", err, w)
 		return
 	}
 }
@@ -409,6 +485,7 @@ func main() {
 	//unix_plugin_router.HandleFunc("/reauth", plugin.handleReauth).Methods("POST")
 	unix_plugin_router.HandleFunc("/status", plugin.handleGetStatus).Methods("GET")
 	unix_plugin_router.HandleFunc("/peers", plugin.handleGetPeers).Methods("GET")
+	unix_plugin_router.HandleFunc("/topology", plugin.handleGetTopology).Methods("GET")
 
 	unix_plugin_router.HandleFunc("/setSPRPeer", plugin.handleSetSPRPeer).Methods("DELETE", "PUT")
 

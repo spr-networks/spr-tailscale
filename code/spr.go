@@ -21,7 +21,7 @@ import (
 )
 
 import (
-	"github.com/spr-networks/sprbus"
+	sprbus "github.com/spr-networks/sprbus-json"
 	"tailscale.com/client/tailscale"
 )
 

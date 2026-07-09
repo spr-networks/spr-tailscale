@@ -17,7 +17,7 @@ import {
 } from '@gluestack-ui/themed'
 
 import { api } from '../API'
-import { Card, StatusDot, KeyVal } from './ui'
+import { Card, StatusDot, KeyVal, timeAgo } from './ui'
 
 const defaultGroup = 'tailnet'
 
@@ -25,16 +25,6 @@ const osLabel = (os) => {
   if (!os) return null
   const map = { linux: 'Linux', macOS: 'macOS', windows: 'Windows', iOS: 'iOS', android: 'Android' }
   return map[os] || os.charAt(0).toUpperCase() + os.slice(1)
-}
-
-const timeAgo = (ts) => {
-  const then = Date.parse(ts)
-  if (Number.isNaN(then)) return ts ? String(ts) : '—'
-  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000))
-  if (secs < 60) return `${secs}s ago`
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
-  return `${Math.floor(secs / 86400)}d ago`
 }
 
 const PeerInfo = ({ configGroups, configPolicies, showAlert, device }) => {

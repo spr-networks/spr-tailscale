@@ -28,7 +28,7 @@ function previewResponse(method, url) {
           PublicKey: 'nodekey:abc123def4567890abc123def4567890abc123def4567890',
           TailscaleIPs: ['100.101.102.103', 'fd7a:115c:a1e0::1234'],
           Addrs: ['73.12.44.9:41641', '192.168.2.10:41641'],
-          LastHandshake: iso(45 * 1000)
+          LastHandshake: '0001-01-01T00:00:00Z' // Go zero value — Self never handshakes itself
         }
       })
     }
@@ -36,7 +36,7 @@ function previewResponse(method, url) {
       return JSON.stringify([
         { HostName: 'alex-macbook', DNSName: 'alex-macbook.tailnet-a1b2.ts.net.', OS: 'macOS', Online: true, TailscaleIPs: ['100.101.102.104'], PublicKey: 'nodekey:aa11223344556677889900aabbccddeeff00112233', LastSeen: iso(30 * 1000), LastHandshake: iso(30 * 1000) },
         { HostName: 'pixel-8', DNSName: 'pixel-8.tailnet-a1b2.ts.net.', OS: 'android', Online: true, TailscaleIPs: ['100.101.102.105'], PublicKey: 'nodekey:bb22334455667788990011aabbccddeeff0011223344', LastSeen: iso(5 * 60 * 1000), LastHandshake: iso(5 * 60 * 1000) },
-        { HostName: 'office-nas', DNSName: 'office-nas.tailnet-a1b2.ts.net.', OS: 'linux', Online: false, TailscaleIPs: ['100.101.102.106'], PublicKey: 'nodekey:cc33445566778899001122aabbccddeeff0011223355', LastSeen: iso(3 * 3600 * 1000), LastHandshake: iso(3 * 3600 * 1000) }
+        { HostName: 'office-nas', DNSName: 'office-nas.tailnet-a1b2.ts.net.', OS: 'linux', Online: false, TailscaleIPs: ['100.101.102.106'], PublicKey: 'nodekey:cc33445566778899001122aabbccddeeff0011223355', LastSeen: iso(3 * 3600 * 1000), LastHandshake: '0001-01-01T00:00:00Z' }
       ])
     }
     if (url.includes('/info/dockernetworks')) {

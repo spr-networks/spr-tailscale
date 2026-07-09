@@ -12,7 +12,7 @@ import {
   VStack
 } from '@gluestack-ui/themed'
 
-import { Card, StatusDot, StatTile, KeyVal } from './ui'
+import { Card, StatusDot, StatTile, KeyVal, timeAgo } from './ui'
 
 const StatusInfo = ({ status }) => {
   const [expanded, setExpanded] = useState(false)
@@ -53,7 +53,7 @@ const StatusInfo = ({ status }) => {
           <StatTile label="Tailscale IP" value={primaryIP} mono />
           <StatTile label="Version" value={status.Version ? String(status.Version).split('-')[0] : null} />
           <StatTile label="Relay" value={self.Relay ? self.Relay.toUpperCase() : null} />
-          <StatTile label="Last handshake" value={self.LastHandshake ? timeAgo(self.LastHandshake) : 'Direct'} />
+          <StatTile label="Last handshake" value={timeAgo(self.LastHandshake)} />
         </HStack>
 
         {/* Details disclosure */}
@@ -94,17 +94,6 @@ const StatusInfo = ({ status }) => {
       </VStack>
     </Card>
   )
-}
-
-// Best-effort humanizer; Tailscale timestamps are RFC3339 strings.
-const timeAgo = (ts) => {
-  const then = Date.parse(ts)
-  if (Number.isNaN(then)) return String(ts)
-  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000))
-  if (secs < 60) return `${secs}s ago`
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
-  return `${Math.floor(secs / 86400)}d ago`
 }
 
 export default StatusInfo
