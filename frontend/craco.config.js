@@ -15,23 +15,27 @@ module.exports = {
       })
 
       // gluestack-ui / gluestack-style ship untranspiled JSX in their published
-      // packages, and CRA's babel-loader only covers src/. Extend that loader's
-      // include list so those modules get transpiled instead of hitting webpack's
-      // raw parser (otherwise: "Module parse failed: Unexpected token").
+      // packages, and CRA's babel-loader only covers src/, so their files hit
+      // webpack's raw parser ("Module parse failed: Unexpected token"). We can't
+      // just add them to the app babel-loader: that runs with sourceType 'module',
+      // and these packages are CommonJS, so their `exports`/`require` get rewritten
+      // as ESM and blow up at runtime ("exports is not defined"). Instead add a
+      // dedicated loader that reuses the app's babel config but with
+      // sourceType 'unambiguous', letting babel detect CJS vs ESM per file.
       const transpileModules = [
         /node_modules[\\/]@gluestack-ui[\\/]/,
         /node_modules[\\/]@gluestack-style[\\/]/,
         /node_modules[\\/]@legendapp[\\/]/
       ]
-      webpackConfig.module.rules.forEach(rule => {
-        if (!rule.oneOf) return
-        rule.oneOf.forEach(loader => {
-          const usesBabel =
-            loader.loader && loader.loader.includes('babel-loader') && loader.include
-          if (usesBabel) {
-            loader.include = [].concat(loader.include, transpileModules)
-          }
-        })
+      const oneOf = webpackConfig.module.rules.find(rule => rule.oneOf).oneOf
+      const appBabel = oneOf.find(
+        loader => loader.loader && loader.loader.includes('babel-loader') && loader.include
+      )
+      oneOf.unshift({
+        test: /\.(js|mjs|jsx)$/,
+        include: transpileModules,
+        loader: appBabel.loader,
+        options: { ...appBabel.options, sourceType: 'unambiguous' }
       })
 
       const oneOfRuleIdx = webpackConfig.module.rules.findIndex(rule => !!rule.oneOf);
