@@ -12,6 +12,7 @@ import {
   Box,
   Button,
   ButtonText,
+  Card,
   CloseIcon,
   Heading,
   HStack,
@@ -19,16 +20,17 @@ import {
   Input,
   InputField,
   Pressable,
+  SectionHeader,
   Text,
+  Toggle,
   VStack,
   View
-} from '@gluestack-ui/themed'
+} from '@spr-networks/plugin-ui'
 
 import { api } from './API'
 
 import StatusInfo from './components/StatusInfo'
 import PeerInfo from './components/PeerInfo'
-import { Card, SectionHeader, Toggle } from './components/ui'
 
 const KEYS_URL = 'https://login.tailscale.com/admin/settings/keys'
 

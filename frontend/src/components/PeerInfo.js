@@ -6,18 +6,21 @@ import {
   Box,
   Button,
   ButtonIcon,
+  Card,
   HStack,
   Icon,
   InfoIcon,
   Input,
   InputField,
+  KeyVal,
   Pressable,
+  StatusDot,
   Text,
-  VStack
-} from '@gluestack-ui/themed'
+  VStack,
+  timeAgo
+} from '@spr-networks/plugin-ui'
 
 import { api } from '../API'
-import { Card, StatusDot, KeyVal, timeAgo } from './ui'
 
 const defaultGroup = 'tailnet'
 

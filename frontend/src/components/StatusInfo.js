@@ -3,16 +3,19 @@ import {
   Badge,
   BadgeText,
   Box,
+  Card,
   HStack,
   Heading,
   Icon,
   InfoIcon,
+  KeyVal,
   Pressable,
+  StatTile,
+  StatusDot,
   Text,
-  VStack
-} from '@gluestack-ui/themed'
-
-import { Card, StatusDot, StatTile, KeyVal, timeAgo } from './ui'
+  VStack,
+  timeAgo
+} from '@spr-networks/plugin-ui'
 
 const StatusInfo = ({ status }) => {
   const [expanded, setExpanded] = useState(false)

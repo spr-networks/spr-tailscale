@@ -25,7 +25,8 @@ module.exports = {
       const transpileModules = [
         /node_modules[\\/]@gluestack-ui[\\/]/,
         /node_modules[\\/]@gluestack-style[\\/]/,
-        /node_modules[\\/]@legendapp[\\/]/
+        /node_modules[\\/]@legendapp[\\/]/,
+        /node_modules[\\/]@spr-networks[\\/]plugin-ui[\\/]/
       ]
       const oneOf = webpackConfig.module.rules.find(rule => rule.oneOf).oneOf
       const appBabel = oneOf.find(

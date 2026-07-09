@@ -7,9 +7,10 @@
     "@gluestack-ui/**/@expo/html-elements": "0.5.1"
   },
   "dependencies": {
-    "@gluestack-style/react": "^1.0.45",
-    "@gluestack-ui/config": "^1.1.2",
-    "@gluestack-ui/themed": "^1.1.3",
+    "@gluestack-style/react": "1.0.45",
+    "@gluestack-ui/config": "1.1.2",
+    "@gluestack-ui/themed": "1.1.3",
+    "@spr-networks/plugin-ui": "git+https://github.com/spr-networks/spr-plugin-ui.git",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -21,8 +22,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "craco start",
+    "build": "craco build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "bundle": "./bundle.sh"
