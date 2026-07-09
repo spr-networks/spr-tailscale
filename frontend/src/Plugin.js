@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   AlertDialog,
   AlertDialogBackdrop,
@@ -11,38 +11,28 @@ import {
   BadgeText,
   Box,
   Button,
-  ButtonIcon,
   ButtonText,
-  Checkbox,
-  CheckboxIcon,
-  CheckIcon,
-  CheckboxIndicator,
-  CheckboxLabel,
+  CloseIcon,
+  Heading,
   HStack,
+  Icon,
   Input,
   InputField,
+  Pressable,
   Text,
   VStack,
-  View,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalCloseButton,
-  ModalBody,
-  ModalFooter,
-  IconButton,
-  TrashIcon,
-  Heading
- } from '@gluestack-ui/themed';
+  View
+} from '@gluestack-ui/themed'
 
 import { api } from './API'
 
 import StatusInfo from './components/StatusInfo'
 import PeerInfo from './components/PeerInfo'
+import { Card, SectionHeader, Toggle } from './components/ui'
+
+const KEYS_URL = 'https://login.tailscale.com/admin/settings/keys'
 
 const PeerList = ({ showAlert, devices, config }) => {
-
   const getGroups = (config, device) => {
     if (!config.Peers) {
       return ['tailnet']
@@ -76,32 +66,71 @@ const PeerList = ({ showAlert, devices, config }) => {
   }
 
   return (
-    <Box>
+    <VStack space="md">
       {Object.values(devices).map((device, index) => (
-        <PeerInfo key={"peer-" + index} configPolicies={getPolicies(config, device)} configGroups={getGroups(config, device)} showAlert={showAlert} key={index} device={device} />
+        <PeerInfo
+          key={index}
+          configPolicies={getPolicies(config, device)}
+          configGroups={getGroups(config, device)}
+          showAlert={showAlert}
+          device={device}
+        />
       ))}
-    </Box>
-  );
-};
+    </VStack>
+  )
+}
 
+// App logomark + title bar.
+const Header = ({ statusLabel, statusAction }) => (
+  <HStack alignItems="center" justifyContent="space-between" flexWrap="wrap" mb="$2">
+    <HStack space="md" alignItems="center">
+      <Box
+        w={44}
+        h={44}
+        borderRadius="$xl"
+        alignItems="center"
+        justifyContent="center"
+        bg="$primary600"
+        sx={{ _dark: { bg: '$primary500' } }}
+      >
+        <Heading size="sm" color="$white">
+          ts
+        </Heading>
+      </Box>
+      <VStack>
+        <Heading size="lg" color="$textLight900" sx={{ _dark: { color: '$textDark50' } }}>
+          Tailscale
+        </Heading>
+        <Text size="sm" color="$muted500">
+          Mesh VPN · SPR
+        </Text>
+      </VStack>
+    </HStack>
+    {statusLabel && (
+      <Badge action={statusAction} variant="outline" borderRadius="$full" size="md">
+        <BadgeText>{statusLabel}</BadgeText>
+      </Badge>
+    )}
+  </HStack>
+)
 
 const SPRTailscale = () => {
-  const [tailscaleAuthKey, setTailscaleAuthKey] = useState('');
+  const [tailscaleAuthKey, setTailscaleAuthKey] = useState('')
   const [configured, setConfigured] = useState(false)
-  const [showAlertDialog, setShowAlertDialog] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
+  const [showAlertDialog, setShowAlertDialog] = useState(false)
+  const [alertTitle, setAlertTitle] = useState('')
+  const [alertMessage, setAlertMessage] = useState('')
 
-  const [tailscalePeers, setTailscalePeers] = useState([]);
-  const [tailscaleStatus, setTailscaleStatus] = useState([]);
+  const [tailscalePeers, setTailscalePeers] = useState([])
+  const [tailscaleStatus, setTailscaleStatus] = useState([])
   const [tailscaleConfig, setTailscaleConfig] = useState({})
   const [exitNode, setExitNode] = useState(false)
 
   const showAlert = (title, message) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setShowAlertDialog(true);
-  };
+    setAlertTitle(title)
+    setAlertMessage(message)
+    setShowAlertDialog(true)
+  }
 
   const getConfig = (callback) => {
     api
@@ -113,7 +142,7 @@ const SPRTailscale = () => {
       .catch(async (err) => {
         if (err.response) {
           let msg = await err.response.text() // setup already done
-          showAlert('Error', `Could not retrieve configuration: ${msg}.`);
+          showAlert('Error', `Could not retrieve configuration: ${msg}.`)
         } else {
           showAlert('Error', `Failed to fetch tailscale config`)
         }
@@ -140,29 +169,28 @@ const SPRTailscale = () => {
       .catch(async (err) => {
         if (err.response) {
           let msg = await err.response.text()
-          showAlert('Error', `Could not retrieve tailscale peers: ${msg}.`);
+          showAlert('Error', `Could not retrieve tailscale peers: ${msg}.`)
         } else {
           showAlert('Error', `Failed to fetch tailscale peers`)
         }
       })
 
-      api
-        .get('/plugins/spr-tailscale/status')
-        .then((res) => {
-          let result = JSON.parse(res)
-          if (result) {
-            setTailscaleStatus(result)
-          }
-        })
-        .catch(async (err) => {
-          if (err.response) {
-            let msg = await err.response.text()
-            showAlert('Error', `Could not retrieve tailscale status: ${msg}.`);
-          } else {
-            showAlert('Error', `Failed to fetch tailscale status`)
-          }
-        })
-
+    api
+      .get('/plugins/spr-tailscale/status')
+      .then((res) => {
+        let result = JSON.parse(res)
+        if (result) {
+          setTailscaleStatus(result)
+        }
+      })
+      .catch(async (err) => {
+        if (err.response) {
+          let msg = await err.response.text()
+          showAlert('Error', `Could not retrieve tailscale status: ${msg}.`)
+        } else {
+          showAlert('Error', `Failed to fetch tailscale status`)
+        }
+      })
   }, [])
 
   const getTailscaleContainerIP = (matchName, callback) => {
@@ -173,8 +201,6 @@ const SPRTailscale = () => {
           (n) => n.Options && n.Options['com.docker.network.bridge.name']
         )
 
-        let s = []
-        let blocks = []
         for (let n of networked) {
           let iface = n.Options['com.docker.network.bridge.name']
           if (n.IPAM?.Config?.[0]?.Subnet) {
@@ -188,13 +214,12 @@ const SPRTailscale = () => {
   }
 
   const setCustomInterface = (done) => {
-
     getTailscaleContainerIP('spr-tailscale', (subnet) => {
       //hack
-      let [ipAddress,] = subnet.split('/');
-      let octets = ipAddress.split('.');
-      octets[3] = '2';
-      let containerIP = octets.join('.');
+      let [ipAddress] = subnet.split('/')
+      let octets = ipAddress.split('.')
+      octets[3] = '2'
+      let containerIP = octets.join('.')
 
       let crule = {
         RuleName: 'spr-tailscale-api-access',
@@ -206,40 +231,41 @@ const SPRTailscale = () => {
         Tags: []
       }
 
-      api.put('/firewall/custom_interface', crule)
+      api
+        .put('/firewall/custom_interface', crule)
         .then(done)
         .catch(async (err) => {
-          let msg = ""
+          let msg = ''
           if (err.response) {
             msg = await err.response.text() // setup already done
           }
           if (!msg.includes('Duplicate rule')) {
-            showAlert('Error', `Failed to set custom firewall rule ${msg}.`);
+            showAlert('Error', `Failed to set custom firewall rule ${msg}.`)
           } else {
             done()
           }
         })
     })
-
   }
 
-  const handleReset = async() => {
+  const handleReset = async () => {
     setTailscaleAuthKey('')
     setConfigured(false)
   }
 
-  const toggleExitNode =  () => {
-
+  const toggleExitNode = () => {
     setExitNode((prev) => !prev)
-
     //call setup again now
     handleSetup()
   }
 
   const handleSetup = async () => {
     if (!tailscaleAuthKey) {
-      showAlert('Error', 'Need Tailscale auth key, generate one with Tailscale on https://login.tailscale.com/admin/settings/keys');
-      return;
+      showAlert(
+        'Error',
+        'Need Tailscale auth key, generate one with Tailscale on https://login.tailscale.com/admin/settings/keys'
+      )
+      return
     }
 
     // Send setup parameters to the API
@@ -250,103 +276,179 @@ const SPRTailscale = () => {
       })
       .then((res) => {
         setCustomInterface(() => {
-          api.put('/plugins/spr-tailscale/up', {})
-          .then((res) => {
-            showAlert('Success', 'Setup completed successfully!');
-            setConfigured(true)
-          }).catch(err => {
-            showAlert('Error', 'Failed to bring tailscale up');
-          })
-
+          api
+            .put('/plugins/spr-tailscale/up', {})
+            .then((res) => {
+              showAlert('Success', 'Setup completed successfully!')
+              setConfigured(true)
+            })
+            .catch((err) => {
+              showAlert('Error', 'Failed to bring tailscale up')
+            })
         })
       })
-      .catch(err => {
-        showAlert('Error', 'An error occurred during setup. Please try again.');
+      .catch((err) => {
+        showAlert('Error', 'An error occurred during setup. Please try again.')
       })
-  };
+  }
+
+  const self = tailscaleStatus.Self
+  const online = self && self.Online === true
+  const running = tailscaleStatus.BackendState === 'Running'
+
+  let headerLabel = 'Not configured'
+  let headerAction = 'muted'
+  if (configured) {
+    if (online) {
+      headerLabel = 'Connected'
+      headerAction = 'success'
+    } else {
+      headerLabel = 'Offline'
+      headerAction = 'warning'
+    }
+  }
 
   return (
     <View
-      h="$full"
-      bg="white"
+      minHeight="$full"
+      bg="$backgroundContentLight"
       sx={{ _dark: { bg: '$backgroundContentDark' } }}
+      px="$4"
+      py="$6"
     >
-      {configured ?
-        <VStack my="$4">
-          { tailscaleStatus.Self != null ?
-            (
-              <>
-              <Heading my="$4" size="md">Tailscale Node</Heading>
-              <StatusInfo status={tailscaleStatus} />
-              <>
-              {tailscaleStatus.Self.Online == false ?
-                <>
-                <Button onPress={handleSetup}>
-                  <ButtonText>Install Tailscale Interface</ButtonText>
-                </Button>
-                <Button onPress={handleReset}>
-                  <ButtonText>Reset Auth Key</ButtonText>
-                </Button>
-                </>
-                :
-                <HStack my="$4" mx="$4">
-                  <Checkbox
-                    key="makeExitNode"
-                    isChecked={exitNode}
-                    onChange={() => toggleExitNode()}
-                  >
-                    <CheckboxIndicator mr="$2">
-                      <CheckboxIcon as={CheckIcon} />
-                    </CheckboxIndicator>
-                    <CheckboxLabel>Make Tailscale Exit Node</CheckboxLabel>
-                  </Checkbox>
-                </HStack>
-                }
-              </>
-              </>
-            )
-            : <Text> Could not get tailscale status </Text>
-          }
+      <VStack w="$full" space="lg" sx={{ '@base': { maxWidth: 860, marginLeft: 'auto', marginRight: 'auto' } }}>
+        <Header statusLabel={headerLabel} statusAction={headerAction} />
 
-          <Heading my="$4" size="md">Tailscale Peers</Heading>
-          <PeerList config={tailscaleConfig} showAlert={showAlert} devices={tailscalePeers}/>
-        </VStack>
-          :
-      (
-        <VStack>
-          <Text> Configure Tailscale: </Text>
-          <Text>Please enter your TAILSCALE_AUTH_KEY:</Text>
-          <Input size="md">
-            <InputField
-              value={tailscaleAuthKey}
-              onChangeText={(value) => setTailscaleAuthKey(value)}
-              onSubmitEditing={(value) => setTailscaleAuthKey(value)}
-            />
-          </Input>
-          <Button onPress={handleSetup}>
-            <ButtonText>Set Up</ButtonText>
-          </Button>
-        </VStack>
-      )}
+        {configured ? (
+          <>
+            {self != null ? (
+              <VStack space="sm">
+                <SectionHeader title="Node" />
+                <StatusInfo status={tailscaleStatus} />
+
+                {online ? (
+                  <Card p="$4">
+                    <HStack alignItems="center" justifyContent="space-between" space="md">
+                      <VStack flexShrink={1}>
+                        <Text
+                          size="md"
+                          fontWeight="$semibold"
+                          color="$textLight900"
+                          sx={{ _dark: { color: '$textDark50' } }}
+                        >
+                          Exit node
+                        </Text>
+                        <Text size="sm" color="$muted500">
+                          Advertise this router as a Tailscale exit node for your tailnet.
+                        </Text>
+                      </VStack>
+                      <Toggle value={exitNode} onPress={toggleExitNode} />
+                    </HStack>
+                  </Card>
+                ) : (
+                  <Card p="$4">
+                    <VStack space="md">
+                      <Text size="sm" color="$muted500">
+                        The node is registered but not online yet. Re-run setup or reset the auth
+                        key to start over.
+                      </Text>
+                      <HStack space="sm" flexWrap="wrap">
+                        <Button action="primary" onPress={handleSetup}>
+                          <ButtonText>Install Tailscale Interface</ButtonText>
+                        </Button>
+                        <Button action="secondary" variant="outline" onPress={handleReset}>
+                          <ButtonText>Reset Auth Key</ButtonText>
+                        </Button>
+                      </HStack>
+                    </VStack>
+                  </Card>
+                )}
+              </VStack>
+            ) : (
+              <Card>
+                <Text color="$muted500">Could not get Tailscale status.</Text>
+              </Card>
+            )}
+
+            <VStack space="sm">
+              <SectionHeader title="Peers" count={Object.values(tailscalePeers).length} />
+              {Object.values(tailscalePeers).length > 0 ? (
+                <PeerList config={tailscaleConfig} showAlert={showAlert} devices={tailscalePeers} />
+              ) : (
+                <Card>
+                  <Text color="$muted500">
+                    No peers yet. Devices that join your tailnet will appear here.
+                  </Text>
+                </Card>
+              )}
+            </VStack>
+          </>
+        ) : (
+          <Card p="$6">
+            <VStack space="lg">
+              <VStack space="xs">
+                <Heading size="md" color="$textLight900" sx={{ _dark: { color: '$textDark50' } }}>
+                  Connect to Tailscale
+                </Heading>
+                <Text size="sm" color="$muted500">
+                  Paste an auth key to join this router to your tailnet.
+                </Text>
+              </VStack>
+
+              <VStack space="xs">
+                <Text
+                  size="2xs"
+                  color="$muted500"
+                  fontWeight="$medium"
+                  sx={{ '@base': { letterSpacing: 0.6, textTransform: 'uppercase' } }}
+                >
+                  Tailscale auth key
+                </Text>
+                <Input size="md" variant="outline">
+                  <InputField
+                    placeholder="tskey-auth-..."
+                    type="password"
+                    value={tailscaleAuthKey}
+                    onChangeText={(value) => setTailscaleAuthKey(value)}
+                    onSubmitEditing={(value) => setTailscaleAuthKey(value)}
+                  />
+                </Input>
+                <Pressable onPress={() => window.open(KEYS_URL, '_blank')}>
+                  <Text size="xs" color="$primary600" sx={{ _dark: { color: '$primary400' } }}>
+                    Generate one in the Tailscale admin console →
+                  </Text>
+                </Pressable>
+              </VStack>
+
+              <Button action="primary" onPress={handleSetup}>
+                <ButtonText>Set up</ButtonText>
+              </Button>
+            </VStack>
+          </Card>
+        )}
+      </VStack>
+
       <AlertDialog isOpen={showAlertDialog} onClose={() => setShowAlertDialog(false)}>
         <AlertDialogBackdrop />
         <AlertDialogContent>
           <AlertDialogHeader>
-            <Text>{alertTitle}</Text>
-            <AlertDialogCloseButton onPress={() => setShowAlertDialog(false)} />
+            <Heading size="sm">{alertTitle}</Heading>
+            <AlertDialogCloseButton onPress={() => setShowAlertDialog(false)}>
+              <Icon as={CloseIcon} />
+            </AlertDialogCloseButton>
           </AlertDialogHeader>
           <AlertDialogBody>
-            <Text>{alertMessage}</Text>
+            <Text size="sm">{alertMessage}</Text>
           </AlertDialogBody>
           <AlertDialogFooter>
-            <Button onPress={() => setShowAlertDialog(false)}>
+            <Button action="primary" onPress={() => setShowAlertDialog(false)}>
               <ButtonText>OK</ButtonText>
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </View>
-  );
-};
+  )
+}
 
-export default SPRTailscale;
+export default SPRTailscale

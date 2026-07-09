@@ -303,7 +303,8 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 		}
 
 		// configure this container into SPR
-		go installFirewallRule()
+		// replaced by policy.json configuration
+		//go installFirewallRule()
 	}
 }
 

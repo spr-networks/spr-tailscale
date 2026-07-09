@@ -7,5 +7,10 @@
   "SandboxedUI": false,
   "InstallTokenPath": "/configs/plugins/spr-tailscale/api-token",
   "ScopedPaths": ["/firewall/config:r", "/firewall/custom_interface"],
+  "NetworkCapabilities": {
+    "Interface": "spr-tailscale",
+    "Policies": ["wan", "dns", "api"],
+    "Groups": ["tailnet"]
+  },
   "Enabled": true
 }

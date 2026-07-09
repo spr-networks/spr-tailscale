@@ -1,8 +1,14 @@
 version: '3.4'
 
-x-logging:
-  &default-logging
-  driver: journald
+#x-logging:
+#  &default-logging
+#  driver: journald
+
+x-labels:
+  &default-labels
+  # constant (not $CI) so digests are reproducible across CI/local
+  org.supernetworks.ci: "true"
+  org.supernetworks.version: ${RELEASE_VERSION:-latest}${RELEASE_CHANNEL:-}
 
 services:
   spr-tailscale:
@@ -10,7 +16,7 @@ services:
     image: ghcr.io/spr-networks/spr-tailscale:${RELEASE_VERSION:-latest}${RELEASE_CHANNEL:-}
     build:
       context: "${BUILDCTX:-.}"
-    logging: *default-logging
+      labels: *default-labels
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
     cap_add:

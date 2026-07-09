@@ -1,0 +1,8 @@
+# Keep the build context deterministic and small. Host-installed deps and build
+# outputs must never leak into the image — the Node stage does a clean
+# --frozen-lockfile install and the Go stage builds from source.
+.git
+**/node_modules
+frontend/build
+**/*.log
+.DS_Store

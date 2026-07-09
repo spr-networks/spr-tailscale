@@ -1,114 +1,110 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 import {
   Badge,
   BadgeText,
   Box,
-  Button,
-  ButtonText,
   HStack,
   Heading,
   Icon,
   InfoIcon,
+  Pressable,
   Text,
-  Tooltip,
-  TooltipContent,
-  TooltipText,
-  VStack,
-} from '@gluestack-ui/themed';
+  VStack
+} from '@gluestack-ui/themed'
+
+import { Card, StatusDot, StatTile, KeyVal } from './ui'
 
 const StatusInfo = ({ status }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  const handleToggleTooltip = () => {
-    setShowTooltip((prevShowTooltip) => !prevShowTooltip);
-  };
+  const [expanded, setExpanded] = useState(false)
+  const self = status.Self || {}
+  const online = self.Online === true
+  const running = status.BackendState === 'Running'
+  const primaryIP = self.TailscaleIPs ? self.TailscaleIPs[0] : null
 
   return (
-    <Box>
-      <VStack flex={2} space="md" mx="$4" sx={{ '@md': { w: '$1/2' } }}>
-      <HStack>
-          <Text  mr="$1" fontWeight="bold">Host:</Text>
-          <Text mr="$4">{status.Self.HostName}</Text>
+    <Card>
+      <VStack space="lg">
+        {/* Hero row: identity + live state */}
+        <HStack space="md" alignItems="center" justifyContent="space-between" flexWrap="wrap">
+          <HStack space="md" alignItems="center" flexShrink={1}>
+            <StatusDot online={online} warn={!online && running} size={12} />
+            <VStack>
+              <Heading size="md" color="$textLight900" sx={{ _dark: { color: '$textDark50' } }}>
+                {self.HostName || 'This node'}
+              </Heading>
+              <Text size="sm" color="$muted500">
+                {self.DNSName ? self.DNSName.replace(/\.$/, '') : 'Tailscale gateway'}
+              </Text>
+            </VStack>
+          </HStack>
 
-          <Tooltip
-            placement="top"
-            isOpen={showTooltip}
-            onOpen={handleToggleTooltip}
-            onClose={handleToggleTooltip}
-            trigger={(triggerProps) => (
-              <HStack {...triggerProps}>
-                <Icon as={InfoIcon} sz="md" />
-              </HStack>
-            )}
+          <HStack space="sm" alignItems="center">
+            <Badge action={running ? 'success' : 'warning'} variant="solid" borderRadius="$full">
+              <BadgeText>{status.BackendState || 'Unknown'}</BadgeText>
+            </Badge>
+            <Badge action={online ? 'success' : 'muted'} variant="outline" borderRadius="$full">
+              <BadgeText>{online ? 'Online' : 'Offline'}</BadgeText>
+            </Badge>
+          </HStack>
+        </HStack>
+
+        {/* Metric grid */}
+        <HStack space="sm" flexWrap="wrap">
+          <StatTile label="Tailscale IP" value={primaryIP} mono />
+          <StatTile label="Version" value={status.Version ? String(status.Version).split('-')[0] : null} />
+          <StatTile label="Relay" value={self.Relay ? self.Relay.toUpperCase() : null} />
+          <StatTile label="Last handshake" value={self.LastHandshake ? timeAgo(self.LastHandshake) : 'Direct'} />
+        </HStack>
+
+        {/* Details disclosure */}
+        <Pressable onPress={() => setExpanded((v) => !v)}>
+          <HStack space="xs" alignItems="center">
+            <Icon as={InfoIcon} size="sm" color="$primary600" sx={{ _dark: { color: '$primary400' } }} />
+            <Text size="sm" color="$primary600" fontWeight="$medium" sx={{ _dark: { color: '$primary400' } }}>
+              {expanded ? 'Hide details' : 'Show details'}
+            </Text>
+          </HStack>
+        </Pressable>
+
+        {expanded && (
+          <Box
+            borderTopWidth={1}
+            borderColor="$borderColorCardLight"
+            pt="$4"
+            sx={{ _dark: { borderColor: '$borderColorCardDark' } }}
           >
-            <TooltipContent bg="white" color="black" p={4}>
-              <VStack alignItems="flex-start" spacing={2}>
-                <HStack>
-                  <Text fontWeight="bold">Backend State:</Text>
-                  <Text>{status.BackendState}</Text>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">Version:</Text>
-                  <Text>{status.Version}</Text>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">Public Key:</Text>
-                  <Text>{status.Self.PublicKey}</Text>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">Hostname:</Text>
-                  <Text>{status.Self.HostName}</Text>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">DNS:</Text>
-                  <Text>{status.Self.DNSName}</Text>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">Tailscale IPs:</Text>
-                  <VStack alignItems="flex-start">
-                    {status.Self.TailscaleIPs && status.Self.TailscaleIPs.map((ip, index) => (
-                      <Text key={index}>{ip}</Text>
-                    ))}
-                  </VStack>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">Addresses:</Text>
-                  <VStack alignItems="flex-start">
-                    {status.Self.Addrs.map((addr, index) => (
-                      <Text key={index}>{addr}</Text>
-                    ))}
-                  </VStack>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">Relay:</Text>
-                  <Text>{status.Self.Relay}</Text>
-                </HStack>
-                <HStack>
-                  <Text fontWeight="bold">Last Handshake:</Text>
-                  <Text>{status.Self.LastHandshake}</Text>
-                </HStack>
-              </VStack>
-            </TooltipContent>
-          </Tooltip>
-        </HStack>
-        <HStack>
-          <Text fontWeight="bold">Tailscale IP:</Text>
-          { status.Self.TailscaleIPs ?
-            <Text>{status.Self.TailscaleIPs[0]}</Text>
-            : null }
-        </HStack>
-        <HStack>
-          <Badge size="lg" action={status.BackendState == "Running" ? "success" : "warning"}>
-            <BadgeText size="lg">{status.BackendState}</BadgeText>
-          </Badge>
-          <Badge size="lg" action={status.Self.Online ? "success" : "warning"}>
-            <BadgeText size="lg">{status.Self.Online ? "Online" : "Offline"}</BadgeText>
-          </Badge>
-        </HStack>
+            <VStack space="sm">
+              <KeyVal label="Backend state" value={status.BackendState} />
+              <KeyVal label="Full version" value={status.Version} />
+              <KeyVal label="Public key" value={self.PublicKey} mono />
+              <KeyVal label="DNS name" value={self.DNSName} mono />
+              <KeyVal
+                label="Tailscale IPs"
+                value={self.TailscaleIPs ? self.TailscaleIPs.join(', ') : null}
+                mono
+              />
+              <KeyVal
+                label="Endpoints"
+                value={self.Addrs ? self.Addrs.join(', ') : null}
+                mono
+              />
+            </VStack>
+          </Box>
+        )}
       </VStack>
+    </Card>
+  )
+}
 
-    </Box>
-  );
-};
+// Best-effort humanizer; Tailscale timestamps are RFC3339 strings.
+const timeAgo = (ts) => {
+  const then = Date.parse(ts)
+  if (Number.isNaN(then)) return String(ts)
+  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000))
+  if (secs < 60) return `${secs}s ago`
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
+  return `${Math.floor(secs / 86400)}d ago`
+}
 
-export default StatusInfo;
+export default StatusInfo
