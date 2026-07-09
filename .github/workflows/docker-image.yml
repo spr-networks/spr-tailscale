@@ -13,6 +13,11 @@ jobs:
 
   buildx:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     steps:
       -
         name: Checkout
@@ -33,12 +38,27 @@ jobs:
         name: Load reproducible build pins
         run: grep -vE '^[[:space:]]*(#|$)' reproducible.env >> "$GITHUB_ENV"
       -
-        name: Compute SOURCE_DATE_EPOCH
-        # Epoch 0 so rewrite-timestamp normalizes every file mtime.
-        run: echo "SOURCE_DATE_EPOCH=0" >> "$GITHUB_ENV"
+        name: Compute SOURCE_DATE_EPOCH and push flag
+        id: repro
+        run: |
+          # Epoch 0 so rewrite-timestamp normalizes every file mtime.
+          echo "SOURCE_DATE_EPOCH=0" >> "$GITHUB_ENV"
+          push=false
+          if { [ "${{ github.event_name }}" = "workflow_run" ] && [ "${{ github.ref_name }}" = "main" ]; } \
+             || { [ -n "${{ env.RELEASE_CHANNEL }}" ] && [ "${{ github.event_name }}" = "push" ]; }; then
+            push=true
+          fi
+          echo "push=$push" >> "$GITHUB_OUTPUT"
       -
         name: Normalize file modes for reproducible COPY layers
         run: find . -path ./.git -prune -o -exec chmod go-w {} +
+      -
+        name: Authenticate to Docker Hub
+        if: ${{ vars.DOCKERHUB_USERNAME != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -57,18 +77,108 @@ jobs:
       -
         name: Build and push containers
         run: |
+          PUSH_FLAG=""
+          [ "${{ steps.repro.outputs.push }}" = "true" ] && PUSH_FLAG="--push"
           ./build_docker_compose.sh \
             --set "*.platform=linux/amd64,linux/arm64" \
             --set "*.tags=ghcr.io/spr-networks/spr-tailscale:${RELEASE_VERSION:-latest}${RELEASE_CHANNEL}" \
             --set "*.tags=ghcr.io/spr-networks/spr-tailscale:latest${RELEASE_CHANNEL}" \
             --set "*.labels.org.supernetworks.ci=true" \
             --set "*.labels.org.supernetworks.version=${RELEASE_VERSION:-latest}${RELEASE_CHANNEL}" \
-            `[[ "${{ github.event_name }}" = "workflow_run" && ("${{ github.ref_name }}" = "main")  || ( ! -z $RELEASE_CHANNEL && ("${{ github.event_name }}" = "push")) ]] && echo "--push"` || exit 1
+            $PUSH_FLAG || exit 1
+      -
+        name: Resolve pushed image digest
+        id: digest
+        if: ${{ steps.repro.outputs.push == 'true' }}
+        run: |
+          DIGEST=$(docker buildx imagetools inspect \
+            "ghcr.io/spr-networks/spr-tailscale:${RELEASE_VERSION:-latest}${RELEASE_CHANNEL}" \
+            --format '{{.Manifest.Digest}}')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
       - name: Get images from docker-compose.yml
         id: get-images
         uses: mikefarah/yq@master
         with:
           cmd: yq -o json -I 0 '[.services|.[]|.image]' docker-compose.yml
+
+      # Install the cosign tool
+      # https://github.com/sigstore/cosign-installer
+      - name: Install Cosign
+        if: ${{ steps.repro.outputs.push == 'true' }}
+        uses: sigstore/cosign-installer@v3.6.0
+
+      - name: Sign the images with GitHub OIDC Token
+        if: ${{ steps.repro.outputs.push == 'true' }}
+        env:
+          IMG1: ghcr.io/spr-networks/spr-tailscale:${{ env.RELEASE_VERSION || 'latest' }}${{ env.RELEASE_CHANNEL }}@${{ steps.digest.outputs.digest }}
+          IMG2: ghcr.io/spr-networks/spr-tailscale:latest${{ env.RELEASE_CHANNEL }}@${{ steps.digest.outputs.digest }}
+        run: |
+          cosign sign --yes ${{ env.IMG1 }} ${{ env.IMG2 }}
+
+      # actions/attest-build-provenance needs GitHub Enterprise on private
+      # repos, so the provenance attestation is done with cosign instead:
+      # keyless via the GitHub OIDC token, stored in the registry next to the
+      # image, logged in Rekor.
+      - name: Generate SLSA provenance predicate
+        if: ${{ steps.repro.outputs.push == 'true' }}
+        run: |
+          cat > /tmp/predicate.json <<EOF
+          {
+            "buildDefinition": {
+              "buildType": "https://actions.github.io/buildtypes/workflow/v1",
+              "externalParameters": {
+                "workflow": {
+                  "ref": "${{ github.ref }}",
+                  "repository": "${{ github.server_url }}/${{ github.repository }}",
+                  "path": ".github/workflows/docker-image.yml"
+                }
+              },
+              "internalParameters": {
+                "github": {
+                  "event_name": "${{ github.event_name }}",
+                  "repository_id": "${{ github.repository_id }}",
+                  "repository_owner_id": "${{ github.repository_owner_id }}"
+                }
+              },
+              "resolvedDependencies": [
+                {
+                  "uri": "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}",
+                  "digest": { "gitCommit": "${{ github.sha }}" }
+                }
+              ]
+            },
+            "runDetails": {
+              "builder": {
+                "id": "${{ github.server_url }}/${{ github.repository }}/.github/workflows/docker-image.yml@${{ github.ref }}"
+              },
+              "metadata": {
+                "invocationId": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+              }
+            }
+          }
+          EOF
+
+      - name: Attest build provenance with GitHub OIDC Token
+        if: ${{ steps.repro.outputs.push == 'true' }}
+        env:
+          IMG: ghcr.io/spr-networks/spr-tailscale@${{ steps.digest.outputs.digest }}
+        run: |
+          cosign attest --yes --type slsaprovenance1 --predicate /tmp/predicate.json ${{ env.IMG }}
+
+      - name: Verify signature and attestation
+        if: ${{ steps.repro.outputs.push == 'true' }}
+        env:
+          IMG: ghcr.io/spr-networks/spr-tailscale@${{ steps.digest.outputs.digest }}
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/spr-networks/spr-tailscale/\.github/workflows/docker-image\.yml@' \
+            ${{ env.IMG }}
+          cosign verify-attestation --type slsaprovenance1 \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/spr-networks/spr-tailscale/\.github/workflows/docker-image\.yml@' \
+            ${{ env.IMG }}
 
       - name: Set Matrix output
         id: set-matrix
