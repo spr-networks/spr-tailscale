@@ -2653,7 +2653,7 @@
 
 "@spr-networks/plugin-ui@git+https://github.com/spr-networks/spr-plugin-ui.git":
   version "0.2.0"
-  resolved "git+https://github.com/spr-networks/spr-plugin-ui.git#ab5a656b9e48bc7b81cd28986dd8a7be0ef32bbd"
+  resolved "git+https://github.com/spr-networks/spr-plugin-ui.git#4f1bb21f5702e1c02fac464f9c7092008988bb23"
 
 "@surma/rollup-plugin-off-main-thread@^2.2.3":
   version "2.2.3"
