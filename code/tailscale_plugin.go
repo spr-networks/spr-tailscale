@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -19,9 +20,12 @@ import (
 	"github.com/vishvananda/netlink"
 	"gopkg.in/validator.v2"
 	"tailscale.com/client/tailscale"
+	"tailscale.com/ipn/ipnstate"
 )
 
 var UNIX_PLUGIN_LISTENER = "/state/plugins/spr-tailscale/socket"
+
+var authKeyRegexp = regexp.MustCompile(`^tskey-[A-Za-z0-9-]+$`)
 
 // Optionally we can adjust this with TS_SOCKET https://tailscale.com/kb/1282/docker#ts_socket
 var UNIX_TAILSCALE_SOCK = "/run/tailscale/tailscaled.sock"
@@ -90,19 +94,30 @@ type Topology struct {
 }
 
 // the container's IPv4 on the spr-tailscale docker network: the "via" address
-// for host routes that egress through this plugin
+// for host routes that egress through this plugin. Skip the tailscale
+// interface itself — interface order is not guaranteed and returning the
+// 100.64.0.0/10 tailnet address here would point sink routes at the wrong hop.
 func containerIPv4() string {
-	addrs, err := net.InterfaceAddrs()
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		return ""
 	}
-	for _, addr := range addrs {
-		ipnet, ok := addr.(*net.IPNet)
-		if !ok || ipnet.IP.IsLoopback() {
+	for _, iface := range ifaces {
+		if iface.Name == TailscaleInterface || iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
-		if ip4 := ipnet.IP.To4(); ip4 != nil {
-			return ip4.String()
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ipnet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if ip4 := ipnet.IP.To4(); ip4 != nil {
+				return ip4.String()
+			}
 		}
 	}
 	return ""
@@ -118,8 +133,29 @@ func (tsp *tailscalePlugin) handleGetTopology(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	rootName := ""
+	rootIP := ""
+	rootOnline := true
+	if tsdStatus.Self != nil {
+		rootName = tsdStatus.Self.HostName
+		if rootName == "" && tsdStatus.Self.DNSName != "" {
+			rootName = strings.SplitN(tsdStatus.Self.DNSName, ".", 2)[0]
+		}
+		if len(tsdStatus.Self.TailscaleIPs) > 0 {
+			rootIP = tsdStatus.Self.TailscaleIPs[0].String()
+		}
+		rootOnline = tsdStatus.Self.Online
+	}
+
 	topo := Topology{
-		Nodes: []TopoNode{{ID: "root", ConnType: "wireguard", Online: true}},
+		Nodes: []TopoNode{{
+			ID:       "root",
+			Kind:     "device",
+			Name:     rootName,
+			IP:       rootIP,
+			ConnType: "wireguard",
+			Online:   rootOnline,
+		}},
 		Edges: []TopoEdge{},
 		Sinks: []TopoSink{{
 			ID:     "tailscale",
@@ -185,32 +221,33 @@ func (tsp *tailscalePlugin) handleGetStatus(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-type handleUpRequest struct {
-	forceReauth    bool   `cmd:"--force-reauth"`
-	authKey        string `validate:"regexp=^tskey-[A-Za-z0-9\\-]+$" cmd:"--auth-key"`
-	exitNode       string `validate:"ipv4" cmd:"--exit-node"`
-	timeoutSeconds string `validate:"duration" cmd:"--timeout"`
+// NOTE fields must be exported or encoding/json silently drops them and the
+// UI only ever sees "{}".
+type handleUpResponse struct {
+	Success bool              `json:"Success"`
+	Message string            `json:"Message"`
+	Args    map[string]string `json:"Args,omitempty"`
 }
 
-type handleUpResponse struct {
-	success bool
-	message string
-	args    map[string]string
+// Pull the most useful error text out of a failed `tailscale up`: prefer the
+// daemon's Health messages (e.g. "last login error=invalid key: API key
+// kpP6QX4mZ921CNTRL not valid"), else the last non-empty output line.
+func tailscaleErrorDetail(out []byte, status *ipnstate.Status) string {
+	if status != nil && len(status.Health) > 0 {
+		return strings.Join(status.Health, "; ")
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if l := strings.TrimSpace(lines[i]); l != "" {
+			return l
+		}
+	}
+	return "unknown error"
 }
 
 func (tsp *tailscalePlugin) handleUp(w http.ResponseWriter, r *http.Request) {
 	tsp.clientMtx.Lock()
 	defer tsp.clientMtx.Unlock()
-
-	var upArgs handleUpRequest
-	if err := json.NewDecoder(r.Body).Decode(&upArgs); err != nil {
-		http.Error(w, err.Error(), 400)
-		return
-	}
-	if err := validator.Validate(upArgs); err != nil {
-		http.Error(w, err.Error(), 400)
-		return
-	}
 
 	status, err := tsp.tsdClient.Status(r.Context())
 	if err != nil {
@@ -220,55 +257,59 @@ func (tsp *tailscalePlugin) handleUp(w http.ResponseWriter, r *http.Request) {
 
 	switch state := status.BackendState; state {
 	case "Running":
-		if !upArgs.forceReauth {
-			// Already up - nothing to be done.
-			json.NewEncoder(w).Encode(handleUpResponse{
-				success: true,
-				message: "tailscale is (already) up",
-			})
-			return
-		} else {
-
-		}
-
-	case "NeedsLogin":
+		// Already up - nothing to be done.
 		json.NewEncoder(w).Encode(handleUpResponse{
-			success: false,
-			message: "please login and authorize this machine",
-			args: map[string]string{
-				"AuthURL": status.AuthURL,
-			},
+			Success: true,
+			Message: "tailscale is (already) up",
 		})
 		return
 
-	case "NeedsMachineAuth":
-		json.NewEncoder(w).Encode(handleUpResponse{
-			success: false,
-			message: "please login and authorize this machine",
-			args: map[string]string{
-				"AuthURL": status.AuthURL,
-			},
-		})
-		return
+	case "NeedsLogin", "NeedsMachineAuth", "Stopped":
+		Configmtx.RLock()
+		haveKey := gConfig.TailscaleAuthKey != ""
+		Configmtx.RUnlock()
 
-	case "Stopped":
-		cmd := exec.Command("/scripts/up.sh")
-		_, cmdErr := cmd.Output()
-		if cmdErr != nil {
+		if !haveKey && state != "Stopped" {
 			json.NewEncoder(w).Encode(handleUpResponse{
-				success: false,
-				message: "unexpected error while bringing up tailscale",
-				args: map[string]string{
-					"error": cmdErr.Error(),
+				Success: false,
+				Message: "please login and authorize this machine",
+				Args: map[string]string{
+					"State":   state,
+					"AuthURL": status.AuthURL,
 				},
 			})
+			return
 		}
+
+		// Run `tailscale up` with the configured key so a stale or invalid
+		// key surfaces its real control-plane error instead of the state name.
+		out, _ := exec.Command("/scripts/up.sh").CombinedOutput()
+
+		newStatus, statusErr := tsp.tsdClient.Status(r.Context())
+		if statusErr == nil && newStatus.BackendState == "Running" {
+			json.NewEncoder(w).Encode(handleUpResponse{
+				Success: true,
+				Message: "tailscale is up",
+			})
+			return
+		}
+
+		json.NewEncoder(w).Encode(handleUpResponse{
+			Success: false,
+			Message: "tailscale login failed: " + tailscaleErrorDetail(out, newStatus),
+			Args: map[string]string{
+				"State":   state,
+				"AuthURL": status.AuthURL,
+				"Detail":  strings.TrimSpace(string(out)),
+			},
+		})
+		return
 
 	default:
 		json.NewEncoder(w).Encode(handleUpResponse{
-			success: false,
-			message: "encountered an unknown state",
-			args: map[string]string{
+			Success: false,
+			Message: "encountered an unknown state: " + state,
+			Args: map[string]string{
 				"State": state,
 			},
 		})
@@ -382,8 +423,15 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 		}
 
 		//validate that cfg has TailscaleAuthKey set
+		cfg.TailscaleAuthKey = strings.TrimSpace(cfg.TailscaleAuthKey)
 		if cfg.TailscaleAuthKey == "" {
 			http.Error(w, "Missing Tailscale Auth Key", 400)
+			return
+		}
+		// strict format check: catches paste artifacts (whitespace, wrapped
+		// lines) and keeps the value safe to write into the sourced config.sh
+		if !authKeyRegexp.MatchString(cfg.TailscaleAuthKey) {
+			http.Error(w, "Invalid Tailscale Auth Key: expected tskey-... (letters, digits, dashes only)", 400)
 			return
 		}
 
@@ -394,6 +442,7 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 		}
 
 		gConfig.TailscaleAuthKey = cfg.TailscaleAuthKey
+		gConfig.AdvertiseExitNode = cfg.AdvertiseExitNode
 		gConfig.APIToken = string(tokendata)
 		err = writeConfigLocked()
 		if err != nil {
@@ -401,9 +450,9 @@ func (tsp *tailscalePlugin) handleGetSetConfig(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		configData := []byte("TAILSCALE_AUTH_KEY=" + gConfig.TailscaleAuthKey)
+		configData := []byte("TAILSCALE_AUTH_KEY=\"" + gConfig.TailscaleAuthKey + "\"\n")
 		if gConfig.AdvertiseExitNode {
-			configData = append(configData, []byte("\nTAILSCALE_EXIT_NODE=1\n")...)
+			configData = append(configData, []byte("TAILSCALE_EXIT_NODE=1\n")...)
 		}
 
 		//also write the tailscale config now

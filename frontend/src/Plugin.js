@@ -273,7 +273,7 @@ const SPRTailscale = () => {
     // Send setup parameters to the API
     api
       .put('/plugins/spr-tailscale/config', {
-        TailScaleAuthKey: tailscaleAuthKey,
+        TailScaleAuthKey: tailscaleAuthKey.trim(),
         AdvertiseExitNode: exitNode
       })
       .then((res) => {
@@ -281,16 +281,37 @@ const SPRTailscale = () => {
           api
             .put('/plugins/spr-tailscale/up', {})
             .then((res) => {
+              let result = {}
+              try {
+                result = typeof res === 'string' ? JSON.parse(res) : res
+              } catch (e) {}
+
+              if (result.Success === false) {
+                // surface the real control-plane error, e.g.
+                // "invalid key: API key kpP6QX4mZ921CNTRL not valid"
+                let detail = result.Args?.Detail ? `\n\n${result.Args.Detail}` : ''
+                showAlert('Tailscale Login Failed', `${result.Message}${detail}`)
+                return
+              }
+
               showAlert('Success', 'Setup completed successfully!')
               setConfigured(true)
             })
-            .catch((err) => {
-              showAlert('Error', 'Failed to bring tailscale up')
+            .catch(async (err) => {
+              let msg = ''
+              if (err.response) {
+                msg = await err.response.text()
+              }
+              showAlert('Error', `Failed to bring tailscale up. ${msg}`)
             })
         })
       })
-      .catch((err) => {
-        showAlert('Error', 'An error occurred during setup. Please try again.')
+      .catch(async (err) => {
+        let msg = ''
+        if (err.response) {
+          msg = await err.response.text()
+        }
+        showAlert('Error', msg || 'An error occurred during setup. Please try again.')
       })
   }
 
@@ -411,8 +432,8 @@ const SPRTailscale = () => {
                     placeholder="tskey-auth-..."
                     type="password"
                     value={tailscaleAuthKey}
-                    onChangeText={(value) => setTailscaleAuthKey(value)}
-                    onSubmitEditing={(value) => setTailscaleAuthKey(value)}
+                    onChangeText={(value) => setTailscaleAuthKey(value.trim())}
+                    onSubmitEditing={handleSetup}
                   />
                 </Input>
                 <Pressable onPress={() => window.open(KEYS_URL, '_blank')}>

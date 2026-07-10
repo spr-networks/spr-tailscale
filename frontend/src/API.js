@@ -20,6 +20,24 @@ function previewResponse(method, url) {
       })
     }
     if (url.includes('/plugins/spr-tailscale/status')) {
+      // add ?previewState=needslogin to the page URL to preview the
+      // failed-login state with Health warnings
+      if (new URLSearchParams(window.location.search).get('previewState') === 'needslogin') {
+        return JSON.stringify({
+          BackendState: 'NeedsLogin',
+          Version: '1.74.1-t0a1b2c3d',
+          Health: [
+            'not logged in, last login error=invalid key: API key kpP6QX4mZ921CNTRL not valid'
+          ],
+          Self: {
+            HostName: 'spr-router',
+            DNSName: '',
+            Online: false,
+            TailscaleIPs: null,
+            LastHandshake: '0001-01-01T00:00:00Z'
+          }
+        })
+      }
       return JSON.stringify({
         BackendState: 'Running',
         Version: '1.74.1-t0a1b2c3d',

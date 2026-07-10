@@ -51,6 +51,27 @@ const StatusInfo = ({ status }) => {
           </HStack>
         </HStack>
 
+        {/* Daemon health warnings — surfaces the real login error, e.g.
+            "last login error=invalid key: API key ... not valid" */}
+        {!running && status.Health?.length > 0 && (
+          <Box
+            borderRadius="$lg"
+            borderWidth={1}
+            borderColor="$amber300"
+            bg="$amber50"
+            p="$3"
+            sx={{ _dark: { bg: 'rgba(245,158,11,0.10)', borderColor: '$amber700' } }}
+          >
+            <VStack space="xs">
+              {status.Health.map((msg, index) => (
+                <Text key={index} size="sm" color="$amber800" sx={{ _dark: { color: '$amber300' } }}>
+                  {msg}
+                </Text>
+              ))}
+            </VStack>
+          </Box>
+        )}
+
         {/* Metric grid */}
         <HStack space="sm" flexWrap="wrap">
           <StatTile label="Tailscale IP" value={primaryIP} mono />
