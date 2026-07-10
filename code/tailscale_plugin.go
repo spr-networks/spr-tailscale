@@ -75,9 +75,37 @@ type TopoEdge struct {
 	Kind  string
 }
 
+type TopoSink struct {
+	ID     string
+	Name   string
+	Iface  string
+	IP     string `json:",omitempty"`
+	Online bool
+}
+
 type Topology struct {
 	Nodes []TopoNode
 	Edges []TopoEdge
+	Sinks []TopoSink `json:",omitempty"`
+}
+
+// the container's IPv4 on the spr-tailscale docker network: the "via" address
+// for host routes that egress through this plugin
+func containerIPv4() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, addr := range addrs {
+		ipnet, ok := addr.(*net.IPNet)
+		if !ok || ipnet.IP.IsLoopback() {
+			continue
+		}
+		if ip4 := ipnet.IP.To4(); ip4 != nil {
+			return ip4.String()
+		}
+	}
+	return ""
 }
 
 func (tsp *tailscalePlugin) handleGetTopology(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +121,13 @@ func (tsp *tailscalePlugin) handleGetTopology(w http.ResponseWriter, r *http.Req
 	topo := Topology{
 		Nodes: []TopoNode{{ID: "root", ConnType: "wireguard", Online: true}},
 		Edges: []TopoEdge{},
+		Sinks: []TopoSink{{
+			ID:     "tailscale",
+			Name:   "Tailscale",
+			Iface:  gSPRTailscaleInterface,
+			IP:     containerIPv4(),
+			Online: tsdStatus.BackendState == "Running",
+		}},
 	}
 	for _, peer := range tsdStatus.Peer {
 		id := string(peer.ID)
