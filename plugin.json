@@ -1,6 +1,6 @@
 {
   "Name": "spr-tailscale",
-  "ComposeFilePath": "plugins/user/spr-tailscale/docker-compose.yml",
+  "Runtime": "kvm",
   "UnixPath": "/state/plugins/spr-tailscale/socket",
   "URI": "spr-tailscale",
   "HasUI": true,
@@ -11,6 +11,7 @@
   "ScopedPaths": ["/firewall/config:r", "/firewall/custom_interface"],
   "NetworkCapabilities": {
     "Interface": "spr-tailscale",
+    "DeviceMAC": "02:53:50:52:4b:14",
     "Policies": ["wan", "dns", "api"],
     "Groups": ["tailnet"]
   },

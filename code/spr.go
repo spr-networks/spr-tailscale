@@ -28,6 +28,12 @@ import (
 var TEST_PREFIX = os.Getenv("TEST_PREFIX")
 var Configmtx sync.RWMutex
 
+func init() {
+	if socketPath := os.Getenv("SPR_KRUN_HOST_SOCKET"); socketPath != "" {
+		sprbus.ServerEventSock = socketPath
+	}
+}
+
 type TailscalePeer struct {
 	NodeKey  string
 	IP       string

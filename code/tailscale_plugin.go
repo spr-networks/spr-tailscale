@@ -545,6 +545,9 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	if socketPath := os.Getenv("SPR_KRUN_PLUGIN_SOCKET"); socketPath != "" {
+		UNIX_PLUGIN_LISTENER = socketPath
+	}
 	loadConfig()
 
 	if err := validator.SetValidationFunc("ipv4", isValidIPv4); err != nil {
