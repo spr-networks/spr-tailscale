@@ -422,8 +422,6 @@ func collectPeerIPs() ([]string, []string) {
 }
 
 func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string) {
-	containerIP := getContainerIP()
-
 	//tbd, check for node keys not matching IP?
 
 	for _, entry := range fw.CustomInterfaceRules {
@@ -443,7 +441,7 @@ func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string) 
 
 			if !found_peer {
 				//scanned tailscale ips, IP is not known, remove it
-				err := updateCustomInterface(true, entry.SrcIP, entry.Policies, entry.Groups, containerIP)
+				err := updateCustomInterface(true, entry.SrcIP, entry.Policies, entry.Groups, entry.RouteDst)
 				if err != nil {
 					fmt.Println("[-] Failed to delete peer "+entry.SrcIP, err)
 				}
@@ -518,13 +516,21 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string
 					//not a tailscale peer
 					continue
 				}
+				if crule.RouteDst != containerIP {
+					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, crule.RouteDst)
+					if err != nil {
+						fmt.Println("[-] Failed to migrate peer "+crule.SrcIP, err)
+						found_peer = true
+					}
+					break
+				}
 
 				ok, new_groups, _, new_policies := matchPeerConfig(crule, ip, node_key)
 				if !ok {
 					//delete peer and reinstall
 					groups = new_groups
 					policies = new_policies
-					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, containerIP)
+					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, crule.RouteDst)
 					if err != nil {
 						fmt.Println("[-] Failed to delete peer "+crule.SrcIP, err)
 					}
