@@ -556,10 +556,15 @@ func rebuildPostrouting() {
 		return
 	}
 
-	// Check if the POSTROUTING chain already exists
-	chainExistsCmd := "nft list chains | grep 'POSTROUTING'"
-	if !commandOutputContains(chainExistsCmd, "POSTROUTING") {
-		// Chain does not exist, so add it
+	if !commandOutputContains("nft list tables", "table ip nat") {
+		addTableCmd := "nft add table ip nat"
+		if err := exec.Command("sh", "-c", addTableCmd).Run(); err != nil {
+			fmt.Printf("Failed to add table: %s\nError: %s\n", addTableCmd, err)
+			return
+		}
+	}
+
+	if !commandOutputContains("nft list table ip nat", "chain POSTROUTING") {
 		addChainCmd := "nft add chain ip nat POSTROUTING { type nat hook postrouting priority 100 \\; }"
 		if err := exec.Command("sh", "-c", addChainCmd).Run(); err != nil {
 			fmt.Printf("Failed to add chain: %s\nError: %s\n", addChainCmd, err)
@@ -567,10 +572,8 @@ func rebuildPostrouting() {
 		}
 	}
 
-	// Check if the masquerade rule for tailscale0 already exists
-	ruleExistsCmd := "nft list ruleset | grep 'oifname \"tailscale0\" masquerade'"
+	ruleExistsCmd := "nft list table ip nat"
 	if !commandOutputContains(ruleExistsCmd, "tailscale0") {
-		// Rule does not exist, so add it
 		addRuleCmd := "nft add rule ip nat POSTROUTING oifname \"tailscale0\" masquerade"
 		if err := exec.Command("sh", "-c", addRuleCmd).Run(); err != nil {
 			fmt.Printf("Failed to add rule: %s\nError: %s\n", addRuleCmd, err)
@@ -579,7 +582,6 @@ func rebuildPostrouting() {
 	}
 }
 
-// commandOutputContains executes a shell command and checks if the output contains the specified string.
 func commandOutputContains(commandStr, searchStr string) bool {
 	cmd := exec.Command("sh", "-c", commandStr)
 	var out bytes.Buffer
