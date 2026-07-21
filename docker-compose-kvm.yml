@@ -20,6 +20,10 @@ services:
       SPR_KRUN_VSOCK_PORT: "4040"
       SPR_KRUN_HOST_SOCKET: "/run/spr-krun-plugin/eventbus.sock"
       SPR_KRUN_HOST_VSOCK_PORT: "4041"
+    volumes:
+      - "${SUPERDIR}./state/public/:/state/public/"
+      - "${SUPERDIR}./state/api/:/state/api/"
+      - "${SUPERDIR}./configs/base/config.sh:/configs/base/config.sh"
 
 networks:
   tailscalenet:
