@@ -6,7 +6,7 @@
   "HasUI": true,
   "Icon": "BlocksIcon",
   "HasTopology": true,
-  "SandboxedUI": false,
+  "SandboxedUI": true,
   "InstallTokenPath": "/configs/plugins/spr-tailscale/api-token",
   "ScopedPaths": ["/firewall/config:r", "/firewall/custom_interface:rw"],
   "NetworkCapabilities": {
