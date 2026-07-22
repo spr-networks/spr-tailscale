@@ -1,7 +1,7 @@
 {
   "Name": "spr-tailscale",
   "Runtime": "kvm",
-  "UnixPath": "/state/plugins/spr-tailscale/socket",
+  "UnixPath": "/state/plugins/spr-tailscale/socket.sock",
   "URI": "spr-tailscale",
   "HasUI": true,
   "Icon": "BlocksIcon",

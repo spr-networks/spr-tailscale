@@ -23,7 +23,7 @@ import (
 	"tailscale.com/ipn/ipnstate"
 )
 
-var UNIX_PLUGIN_LISTENER = "/state/plugins/spr-tailscale/socket"
+var UNIX_PLUGIN_LISTENER = "/state/plugins/spr-tailscale/socket.sock"
 
 var authKeyRegexp = regexp.MustCompile(`^tskey-[A-Za-z0-9-]+$`)
 
