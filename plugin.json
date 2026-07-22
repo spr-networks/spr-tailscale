@@ -8,7 +8,7 @@
   "HasTopology": true,
   "SandboxedUI": false,
   "InstallTokenPath": "/configs/plugins/spr-tailscale/api-token",
-  "ScopedPaths": ["/firewall/config:r", "/firewall/custom_interface"],
+  "ScopedPaths": ["/firewall/config:r", "/firewall/custom_interface:rw"],
   "NetworkCapabilities": {
     "Interface": "spr-tailscale",
     "DeviceMAC": "02:53:50:52:4b:14",
