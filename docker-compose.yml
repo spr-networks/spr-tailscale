@@ -25,6 +25,8 @@ services:
     sysctls:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.route_localnet=1
+    devices:
+      - /dev/net/tun:/dev/net/tun
     networks:
       tailscalenet:
     volumes:
@@ -34,7 +36,6 @@ services:
       - "${SUPERDIR}./configs/base/config.sh:/configs/base/config.sh:ro"
       - "${SUPERDIR}./configs/plugins/spr-tailscale:/configs/spr-tailscale"
       - "${SUPERDIR}./state/plugins/spr-tailscale/varlib:/var/lib"
-      - /dev/net/tun:/dev/net/tun
 
 # Note, if updating the bridge name,
 # // also make an udpate in tailscale_plugin.go in gSPRTailscaleInterface

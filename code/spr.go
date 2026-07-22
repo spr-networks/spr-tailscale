@@ -28,6 +28,12 @@ import (
 var TEST_PREFIX = os.Getenv("TEST_PREFIX")
 var Configmtx sync.RWMutex
 
+func init() {
+	if socketPath := os.Getenv("SPR_KRUN_HOST_SOCKET"); socketPath != "" {
+		sprbus.ServerEventSock = socketPath
+	}
+}
+
 type TailscalePeer struct {
 	NodeKey  string
 	IP       string
@@ -416,8 +422,6 @@ func collectPeerIPs() ([]string, []string) {
 }
 
 func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string) {
-	containerIP := getContainerIP()
-
 	//tbd, check for node keys not matching IP?
 
 	for _, entry := range fw.CustomInterfaceRules {
@@ -437,7 +441,7 @@ func cleanOldPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string) 
 
 			if !found_peer {
 				//scanned tailscale ips, IP is not known, remove it
-				err := updateCustomInterface(true, entry.SrcIP, entry.Policies, entry.Groups, containerIP)
+				err := updateCustomInterface(true, entry.SrcIP, entry.Policies, entry.Groups, entry.RouteDst)
 				if err != nil {
 					fmt.Println("[-] Failed to delete peer "+entry.SrcIP, err)
 				}
@@ -512,13 +516,21 @@ func installNewPeers(fw FirewallConfig, tailscaleIPs []string, nodeKeys []string
 					//not a tailscale peer
 					continue
 				}
+				if crule.RouteDst != containerIP {
+					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, crule.RouteDst)
+					if err != nil {
+						fmt.Println("[-] Failed to migrate peer "+crule.SrcIP, err)
+						found_peer = true
+					}
+					break
+				}
 
 				ok, new_groups, _, new_policies := matchPeerConfig(crule, ip, node_key)
 				if !ok {
 					//delete peer and reinstall
 					groups = new_groups
 					policies = new_policies
-					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, containerIP)
+					err := updateCustomInterface(true, crule.SrcIP, crule.Policies, crule.Groups, crule.RouteDst)
 					if err != nil {
 						fmt.Println("[-] Failed to delete peer "+crule.SrcIP, err)
 					}
@@ -550,10 +562,15 @@ func rebuildPostrouting() {
 		return
 	}
 
-	// Check if the POSTROUTING chain already exists
-	chainExistsCmd := "nft list chains | grep 'POSTROUTING'"
-	if !commandOutputContains(chainExistsCmd, "POSTROUTING") {
-		// Chain does not exist, so add it
+	if !commandOutputContains("nft list tables", "table ip nat") {
+		addTableCmd := "nft add table ip nat"
+		if err := exec.Command("sh", "-c", addTableCmd).Run(); err != nil {
+			fmt.Printf("Failed to add table: %s\nError: %s\n", addTableCmd, err)
+			return
+		}
+	}
+
+	if !commandOutputContains("nft list table ip nat", "chain POSTROUTING") {
 		addChainCmd := "nft add chain ip nat POSTROUTING { type nat hook postrouting priority 100 \\; }"
 		if err := exec.Command("sh", "-c", addChainCmd).Run(); err != nil {
 			fmt.Printf("Failed to add chain: %s\nError: %s\n", addChainCmd, err)
@@ -561,10 +578,8 @@ func rebuildPostrouting() {
 		}
 	}
 
-	// Check if the masquerade rule for tailscale0 already exists
-	ruleExistsCmd := "nft list ruleset | grep 'oifname \"tailscale0\" masquerade'"
+	ruleExistsCmd := "nft list table ip nat"
 	if !commandOutputContains(ruleExistsCmd, "tailscale0") {
-		// Rule does not exist, so add it
 		addRuleCmd := "nft add rule ip nat POSTROUTING oifname \"tailscale0\" masquerade"
 		if err := exec.Command("sh", "-c", addRuleCmd).Run(); err != nil {
 			fmt.Printf("Failed to add rule: %s\nError: %s\n", addRuleCmd, err)
@@ -573,7 +588,6 @@ func rebuildPostrouting() {
 	}
 }
 
-// commandOutputContains executes a shell command and checks if the output contains the specified string.
 func commandOutputContains(commandStr, searchStr string) bool {
 	cmd := exec.Command("sh", "-c", commandStr)
 	var out bytes.Buffer
