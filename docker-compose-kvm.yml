@@ -10,7 +10,6 @@ services:
       krun.ram_mib: "${SPR_KRUN_RAM_MIB:-128}"
       krun.tap_name: "kruntap0"
       krun.net_uplink: "eth0"
-      krun.net_mac: "${SPR_KRUN_MAC:-02:53:50:52:4b:14}"
       krun.vsock_path: "/state/plugins/spr-tailscale/socket.sock"
       krun.vsock_port: "4040"
       krun.vsock_connect_path: "/state/api/eventbus.sock"
