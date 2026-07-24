@@ -13,7 +13,7 @@ x-labels:
 services:
   spr-tailscale:
     container_name: spr-tailscale
-    image: ghcr.io/spr-networks/spr-tailscale:${RELEASE_VERSION:-latest}${RELEASE_CHANNEL:-}
+    image: ghcr.io/spr-networks/spr-tailscale:latest
     build:
       context: "${BUILDCTX:-.}"
       labels: *default-labels
