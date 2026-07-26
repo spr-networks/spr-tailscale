@@ -4,6 +4,7 @@ services:
       file: docker-compose.yml
       service: spr-tailscale
     image: ghcr.io/spr-networks/spr-tailscale:latest
+    build: !reset null
     runtime: ${SPR_KRUN_RUNTIME:-spr-krun}
     annotations:
       krun.cpus: "${SPR_KRUN_CPUS:-1}"
@@ -33,3 +34,4 @@ networks:
     name: spr-tailscale
     driver_opts:
       com.docker.network.bridge.name: spr-tailscale
+      com.docker.network.bridge.inhibit_ipv4: "true"
