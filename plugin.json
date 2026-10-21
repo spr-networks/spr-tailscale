@@ -12,6 +12,7 @@
   "NetworkCapabilities": {
     "Interface": "spr-tailscale",
     "DeviceMAC": "02:53:50:52:4b:14",
+    "TransparentSink": true,
     "Policies": ["wan", "dns", "api"],
     "Groups": ["tailnet"]
   },
